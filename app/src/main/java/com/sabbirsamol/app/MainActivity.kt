@@ -1,7 +1,14 @@
 package com.sabbirsamol.app
 
 import android.accounts.AccountManager
-import android.app.*
+import android.app.Activity
+import android.app.AlarmManager
+import android.app.AlertDialog
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.TimePickerDialog
 import android.content.ActivityNotFoundException
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -18,7 +25,15 @@ import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.view.Gravity
-import android.widget.*
+import android.widget.ArrayAdapter
+import android.widget.Button
+import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.Spinner
+import android.widget.Switch
+import android.widget.TextView
+import android.widget.Toast
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -29,7 +44,11 @@ import java.net.URL
 import java.text.SimpleDateFormat
 import java.time.chrono.HijrahDate
 import java.time.temporal.ChronoField
-import java.util.*
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+import java.util.Stack
+import java.util.UUID
 import kotlin.concurrent.thread
 
 data class ZikrItem(
@@ -133,7 +152,7 @@ class MainActivity : Activity() {
         val amPm = if (h < 12) "AM" else "PM"
         if (h > 12) h -= 12
         if (h == 0) h = 12
-        return "${toBangla(String.format("%02d", h))}:${toBangla(String.format("%02d", m))} $amPm"
+        return "${toBangla(String.format(Locale.US, "%02d", h))}:${toBangla(String.format(Locale.US, "%02d", m))} $amPm"
     }
 
     private fun checkAndResetTasbihCount() {
@@ -266,10 +285,6 @@ class MainActivity : Activity() {
                 }
             } catch (e: Exception) { initDefaultZikr() }
         } else { initDefaultZikr() }
-
-        if (activeZikrId.isEmpty() || zikrList.none { it.id == activeZikrId }) {
-            activeZikrId = zikrList.firstOrNull()?.id ?: "1"
-        }
 
         val savedNotes = prefs.getString("note_items_json", null)
         noteList.clear()
@@ -631,7 +646,7 @@ class MainActivity : Activity() {
         var h12 = hour24 % 12
         if (h12 == 0) h12 = 12
         val amPm = if (hour24 < 12) "পূর্বাহ্ন (AM)" else "অপরাহ্ন (PM)"
-        val liveClockStr = String.format("%02d:%02d:%02d %s", h12, min, sec, amPm)
+        val liveClockStr = String.format(Locale.US, "%02d:%02d:%02d %s", h12, min, sec, amPm)
         liveClockTextView?.text = "🕒 বর্তমান সময়: " + toBangla(liveClockStr)
 
         val (hijri, bangla, english) = getCombinedIslamicDate()
@@ -676,7 +691,7 @@ class MainActivity : Activity() {
         val m = (diffSec % 3600) / 60
         val s = diffSec % 60
 
-        val timeString = String.format("%02d:%02d:%02d", h, m, s)
+        val timeString = String.format(Locale.US, "%02d:%02d:%02d", h, m, s)
         liveWaqtTextView?.text = waqtName
         liveTimerTextView?.text = toBangla(timeString)
     }
@@ -1413,11 +1428,11 @@ class MainActivity : Activity() {
         content.addView(h)
 
         val items = listOf(
-            "সূরা আল-ফাতিহা (৩ বার)" to "بِسْمِ اللهِ الرَّحْمَنِ الرَّحِيمِ (1) الْحَمْدُ لِلَّهِ رَبِّ الْعَلَمِينَ (٢) الرَّحْمَنِ الرَّحِيمِ (۳) مَلِكِ يَوْمِ الدِّينِ (4) إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ (٥) اِهْدِنَا الصِّরَاطَ الْمُسْتَقِيمَ (6) صِرَاطَ الَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ الْمَغْضُوبِ عَلَيْهِمْ وَلَا الضَّالِّينَ (۷)[span_0](start_span)"[span_0](end_span),
+            "সূরা আল-ফাতিহা (৩ বার)" to "بِسْمِ اللهِ الرَّحْمَنِ الرَّحِيمِ (1) الْحَمْدُ لِلَّهِ رَبِّ الْعَلَمِينَ (٢) الرَّحْمَنِ الرَّحِيمِ (۳) مَلِكِ يَوْمِ الدِّينِ (4) إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ (٥) اِهْدِنَا الصِّرَاطَ الْمُسْتَقِيمَ (6) صِرَاطَ الَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ الْمَغْضُوبِ عَلَيْهِمْ وَلَا الضَّالِّينَ (۷)[span_0](start_span)"[span_0](end_span),
             "আয়াতুল কুরসি (৩ বার)" to "اللهُ لَا إِلَهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ ، لَا تَأْخُذُهُ سِنَةٌ وَلَا نَوْمٌ لَهُ مَا فِي السَّمَاتِ وَمَا فِي الْأَرْضِ مَنْ ذَا الَّذِي يَشْفَعُ عِنْدَةً إِلَّا بِإِذْنِهِ يَعْلَمُ مَا بَيْنَ أَيْদِيهِمْ وَمَا خَلْفَهُمْ وَلَا يُحِيطُونَ بِشَيْءٍ مِّنْ عِلْمِهِ إِلَّا بِمَا شَاءَ وَسِعَ كُرْسِيُّهُ السَّمَوَاتِ وَالْأَرْضَ وَلَا يَئُودُهُ حِفْظُهُمَا وَهُوَ الْعَلِيُّ الْعَظِيمُ[span_1](start_span)"[span_1](end_span),
             "৪ কুল ও বিশেষ দু'আসমূহ" to "সূরা আল-কাফিরূন, সূরা আল-ইখলাস, সূরা আল-ফালাক, সূরা আন-নাস (প্রত্যেকটি ৩ বার করে)[span_2](start_span)"[span_2](end_span),
             "সকাল ও সন্ধ্যার তাসবিহ" to "সুবহানাল্লাহ (১০ বার), আলহামদুলিল্লাহ (১০ বার), আল্লাহু আকবার (১০ বার)\n\nলা ইলাহা ইল্লাল্লাহু ওয়াহদাহু লা শারীকা লাহু... (১০০ বার)[span_3](start_span)"[span_3](end_span),
-            "সায়্যিদুল ইস্তিগফার (১ বার)" to "اللَّهُمَّ أَنْتَ رَبِّي لَا إِلَهَ إِلَّا أَنْتَ، خَلَقْتَنِي وَأَنَا عَبْدُكَ ، وَأَنَا عَلَى عَهْدِكَ وَوَعْدِكَ مَا اسْتَطَعْتُ ، أَعُوذُ بِكَ مِنْ شَرِّ مَا صَنَعْتُ ، أَبُوءُ لَكَ بِنِعْمَتِكَ عَلَيَّ، وَأَبُوءُ لَكَ بِذَنْبِي فَاغْফِرْ লِي، فَإِنَّهُ لَا يَغْفِرُ الذُّنُوبَ إِلَّا أَنْتَ[span_4](start_span)"[span_4](end_span),
+            "সায়্যিদুল ইস্তিগফার (১ বার)" to "اللَّهُمَّ أَنْتَ رَبِّي لَا إِلَهَ إِلَّا أَنْتَ، خَلَقْتَنِي وَأَنَا عَبْدُكَ ، وَأَنَا عَلَى عَهْدِكَ وَوَعْدِكَ مَا اسْتَطَعْتُ ، أَعُوذُ بِكَ مِنْ شَرِّ مَا صَنَعْتُ ، أَبُوءُ لَكَ بِنِعْمَتِكَ عَلَيَّ، وَأَبُوءُ لَكَ بِذَنْبِي فَاغْفِرْ লِي، فَإِنَّهُ لَا يَغْفِرُ الذُّنُوبَ إِلَّا أَنْتَ[span_4](start_span)"[span_4](end_span),
             "ঘুমানোর পূর্বের আমল" to "১. ওযু করে ঘুমানো।\n২. বিছানা ঝেড়ে শোয়া।\n৩. আয়াতুল কুরসি পড়া।\n৪. ৩ কুল পড়ে শরীরে ফু দেওয়া।\n৫. ঘুমের দোয়া: (اللَّهُمَّ بِاسْمِكَ أَمُوتُ وَأَحْيَا)\n৬. ঘুম থেকে উঠে দোয়া পড়া।[span_5](start_span)"[span_5](end_span)
         )
 
