@@ -24,7 +24,11 @@ jobs:
     - name: Generate Android Project
       run: |
         mkdir -p app/src/main/res/values
+        mkdir -p ~/.android
         
+        # ডিফল্ট সাইনিং কি তৈরি করা যাতে কোনো ফোনে ইনস্টলেশন ব্লক না হয়
+        keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+
         cat << 'EOF' > settings.gradle
         rootProject.name = "SabbirsAmol"
         include ':app'
@@ -52,6 +56,7 @@ jobs:
         cat << 'EOF' > gradle.properties
         org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
         android.useAndroidX=true
+        kotlin.code.style=official
         EOF
 
         cat << 'EOF' > app/build.gradle
@@ -70,12 +75,6 @@ jobs:
                 versionName "3.0"
             }
 
-            signingConfigs {
-                debug {
-                    storeFile file("${System.properties['user.home']}/.android/debug.keystore")
-                }
-            }
-
             compileOptions {
                 sourceCompatibility JavaVersion.VERSION_17
                 targetCompatibility JavaVersion.VERSION_17
@@ -87,7 +86,8 @@ jobs:
 
             buildTypes {
                 debug {
-                    signingConfig signingConfigs.debug
+                    minifyEnabled false
+                    debuggable true
                 }
             }
         }
@@ -124,11 +124,10 @@ jobs:
         cache-disabled: true
 
     - name: Build Debug APK
-      run: gradle assembleDebug --no-daemon
+      run: gradle assembleDebug --no-daemon --stacktrace
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: Sabbirs-Tasbih-APK
         path: app/build/outputs/apk/debug/*.apk
-        
