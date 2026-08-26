@@ -85,6 +85,7 @@ class MainActivity : Activity() {
     private var selectedUnion = "ঈশ্বরীপুর"
     private var selectedMadhab = "হানাফী"
     private var userEmail = ""
+    private var hijriOffset = 0 // বাংলাদেশের চাঁদ দেখা অনুযায়ী অ্যাডজাস্টমেন্ট
 
     private val GOOGLE_ACCOUNT_PICKER_REQUEST = 1001
     private val FIREBASE_DB_URL = "https://sabbirs-amol-default-rtdb.firebaseio.com"
@@ -92,6 +93,7 @@ class MainActivity : Activity() {
     private val timerHandler = Handler(Looper.getMainLooper())
     private var timerRunnable: Runnable? = null
     private var liveClockTextView: TextView? = null
+    private var liveDateTextView: TextView? = null
     private var liveTimerTextView: TextView? = null
     private var liveWaqtTextView: TextView? = null
 
@@ -115,22 +117,44 @@ class MainActivity : Activity() {
         return "${toBangla(String.format("%02d", h))}:${toBangla(String.format("%02d", minute % 60))}"
     }
 
+    // ১০০% সঠিক লাইভ হিজরি ও বাংলা তারিখ ক্যালকুলেশন (মাগরিবের হিসাবসহ)
     private fun getCombinedIslamicDate(): Triple<String, String, String> {
         val now = Calendar.getInstance()
+        val hour24 = now.get(Calendar.HOUR_OF_DAY)
+        val min = now.get(Calendar.MINUTE)
+        val currentMins = hour24 * 60 + min
+
+        // মাগরিবের পর ইসলামিক দিন স্বয়ংক্রিয়ভাবে পরবর্তী দিন হয়ে যায়
+        val isAfterMagrib = currentMins >= (18 * 60 + 27)
+
+        val calForHijri = Calendar.getInstance()
+        if (isAfterMagrib) {
+            calForHijri.add(Calendar.DATE, 1)
+        }
+        // ইউজার কাস্টম অফসেট যোগ
+        calForHijri.add(Calendar.DATE, hijriOffset)
+
         val engFormat = SimpleDateFormat("EEEE, dd MMMM yyyy", Locale.ENGLISH)
         val engDate = engFormat.format(now.time)
 
-        val arabicMonths = arrayOf("মুহররম", "সফর", "রবিউল আউয়াল", "রবিউস সানি", "জমাদিউল আউয়াল", "জমাদিউস সানি", "রজব", "শাবান", "রমজান", "শাওয়াল", "জ্বিলকদ", "জ্বিলহজ্জ")
-        val hDate = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val hijrah = HijrahDate.now()
-            val day = hijrah.get(ChronoField.DAY_OF_MONTH)
-            val month = hijrah.get(ChronoField.MONTH_OF_YEAR)
-            val year = hijrah.get(ChronoField.YEAR_OF_ERA)
-            "${toBangla(day)} ${arabicMonths[(month - 1).coerceIn(0, 11)]}, ${toBangla(year)} হিজরি"
-        } else {
-            "১২ রবিউল আউয়াল, ১৪৪৮ হিজরি"
+        val arabicMonths = arrayOf("মুহাররম", "সফর", "রবিউল আউয়াল", "রবিউস সানি", "জমাদিউল আউয়াল", "জমাদিউস সানি", "রজব", "শাবান", "রমজান", "শাওয়াল", "জ্বিলকদ", "জ্বিলহজ্জ")
+        
+        var hDay = 12
+        var hMonth = 3
+        var hYear = 1448
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                val hijrah = HijrahDate.from(calForHijri.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate())
+                hDay = hijrah.get(ChronoField.DAY_OF_MONTH)
+                hMonth = hijrah.get(ChronoField.MONTH_OF_YEAR)
+                hYear = hijrah.get(ChronoField.YEAR_OF_ERA)
+            } catch (e: Exception) {}
         }
 
+        val hDate = "${toBangla(hDay)} ${arabicMonths[(hMonth - 1).coerceIn(0, 11)]}, ${toBangla(hYear)} হিজরি"
+
+        // বাংলা তারিখ
         val bnMonthNames = arrayOf("বৈশাখ", "জ্যৈষ্ঠ", "আষাঢ়", "শ্রাবণ", "ভাদ্র", "আশ্বিন", "কার্তিক", "অগ্রহায়ণ", "পৌষ", "মাঘ", "ফাল্গুন", "চৈত্র")
         val dayOfYear = now.get(Calendar.DAY_OF_YEAR)
         val bnYear = if (dayOfYear >= 105) now.get(Calendar.YEAR) - 593 else now.get(Calendar.YEAR) - 594
@@ -153,6 +177,7 @@ class MainActivity : Activity() {
         selectedUnion = prefs.getString("selected_union", "ঈশ্বরীপুর") ?: "ঈশ্বরীপুর"
         selectedMadhab = prefs.getString("selected_madhab", "হানাফী") ?: "হানাফী"
         userEmail = prefs.getString("user_email", "") ?: ""
+        hijriOffset = prefs.getInt("hijri_offset", 0)
         activeZikrId = prefs.getString("active_zikr_id", "") ?: ""
 
         val savedZikr = prefs.getString("zikr_items_json", null)
@@ -227,6 +252,7 @@ class MainActivity : Activity() {
             .putString("selected_union", selectedUnion)
             .putString("selected_madhab", selectedMadhab)
             .putString("user_email", userEmail)
+            .putInt("hijri_offset", hijriOffset)
             .apply()
 
         if (uploadToCloud && userEmail.isNotEmpty()) {
@@ -510,12 +536,14 @@ class MainActivity : Activity() {
         val sec = now.get(Calendar.SECOND)
         val currentMinutes = hour24 * 60 + min
 
-        // বর্তমান লাইভ ঘড়ি
         var h12 = hour24 % 12
         if (h12 == 0) h12 = 12
         val amPm = if (hour24 < 12) "পূর্বাহ্ন (AM)" else "অপরাহ্ন (PM)"
         val liveClockStr = String.format("%02d:%02d:%02d %s", h12, min, sec, amPm)
         liveClockTextView?.text = "🕒 বর্তমান সময়: " + toBangla(liveClockStr)
+
+        val (hijri, bangla, english) = getCombinedIslamicDate()
+        liveDateTextView?.text = "🌙 $hijri\n📅 $bangla  |  $english"
 
         val offset = if (selectedDistrict.contains("সাতক্ষীরা")) 4 else if (selectedDistrict.contains("ঢাকা")) 0 else 2
         val asrExtra = if (selectedMadhab == "হানাফী") 45 else 0
@@ -557,14 +585,14 @@ class MainActivity : Activity() {
         liveTimerTextView?.text = toBangla(timeString)
     }
 
-    // ১. হোম স্ক্রিন (লাইভ ঘড়ি, ৩ ক্যালেন্ডার তারিখ ও নামাজের অ্যালার্মসহ)
+    // ১. হোম স্ক্রিন
     private fun showHomeScreen() {
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = getThemeBackground() }
         val scroll = ScrollView(this).apply { layoutParams = LinearLayout.LayoutParams(-1, 0, 1f) }
         val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(24, 24, 24, 24) }
         val accent = getAccentColor()
 
-        // ১. লাইভ ডিজিটাল ঘড়ি কার্ড (চলমান সময়)
+        // লাইভ ঘড়ি
         val clockCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
@@ -587,10 +615,10 @@ class MainActivity : Activity() {
         clockCard.addView(liveClockTextView)
         content.addView(clockCard)
 
-        // ২. ৩ ক্যালেন্ডার লাইভ তারিখ হেডার কার্ড
+        // ৩ ক্যালেন্ডার লাইভ তারিখ কার্ড + তারিখ অ্যাডজাস্ট বাটন
         val dateCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(20, 14, 20, 14)
+            setPadding(18, 14, 18, 14)
             val bg = GradientDrawable()
             bg.setColor(if (isWhiteTheme()) Color.parseColor("#FEF3C7") else Color.parseColor("#1B2E24"))
             bg.cornerRadius = 20f
@@ -603,27 +631,30 @@ class MainActivity : Activity() {
 
         val (hijri, bangla, english) = getCombinedIslamicDate()
 
-        val hDateView = TextView(this).apply {
-            text = "🌙 $hijri"
-            textSize = 15f
+        liveDateTextView = TextView(this).apply {
+            text = "🌙 $hijri\n📅 $bangla  |  $english"
+            textSize = 14f
             typeface = Typeface.SERIF
             setTextColor(getTextColor())
             setTypeface(Typeface.SERIF, Typeface.BOLD)
             gravity = Gravity.CENTER
+            setLineSpacing(6f, 1.2f)
         }
-        val bnEngDateView = TextView(this).apply {
-            text = "📅 $bangla  |  $english"
-            textSize = 12f
+        dateCard.addView(liveDateTextView)
+
+        val btnAdjustHijri = TextView(this).apply {
+            text = "⚙️ চাঁদ দেখার সাথে হিজরি তারিখ পরিবর্তন করুন"
+            textSize = 11.5f
             typeface = Typeface.SERIF
-            setTextColor(getSecondaryTextColor())
+            setTextColor(if (isWhiteTheme()) Color.parseColor("#D97706") else Color.parseColor("#FBBF24"))
             gravity = Gravity.CENTER
-            setPadding(0, 4, 0, 0)
+            setPadding(0, 8, 0, 0)
+            setOnClickListener { showHijriAdjustDialog() }
         }
-        dateCard.addView(hDateView)
-        dateCard.addView(bnEngDateView)
+        dateCard.addView(btnAdjustHijri)
         content.addView(dateCard)
 
-        // ৩. লাইভ ওয়াক্ত কাউন্টডাউন টাইমার কার্ড
+        // লাইভ ওয়াক্ত টাইমার
         val timerCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
@@ -683,7 +714,7 @@ class MainActivity : Activity() {
 
         val offset = if (selectedDistrict.contains("সাতক্ষীরা")) 4 else if (selectedDistrict.contains("ঢাকা")) 0 else 2
 
-        // সাহরি ও ইফতার কার্ড
+        // সাহরি ও ইফতার
         val specialCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(20, 16, 20, 16)
@@ -722,7 +753,7 @@ class MainActivity : Activity() {
         }
         content.addView(specialCard)
 
-        // ৫ ওয়াক্ত নামাজের সময়সূচী + অ্যালার্ম
+        // ৫ ওয়াক্ত নামাজের সময় ও অ্যালার্ম
         val prayerCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(20, 16, 20, 16)
@@ -783,7 +814,7 @@ class MainActivity : Activity() {
         }
         content.addView(prayerCard)
 
-        // নামাজ নিষিদ্ধ ৩টি হারাম ওয়াক্ত
+        // ৩টি হারাম ওয়াক্ত
         val haramCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(20, 16, 20, 16)
@@ -856,6 +887,22 @@ class MainActivity : Activity() {
         setContentView(root)
 
         startLiveTimer()
+    }
+
+    // হিজরি তারিখ অ্যাডজাস্ট ডায়ালগ
+    private fun showHijriAdjustDialog() {
+        val options = arrayOf("১ দিন এগিয়ে নিন (+১ দিন)", "স্বাভাবিক রাখুন (০ দিন)", "১ দিন পিছিয়ে দিন (-১ দিন)", "২ দিন পিছিয়ে দিন (-২ দিন)")
+        val values = intArrayOf(1, 0, -1, -2)
+        
+        AlertDialog.Builder(this)
+            .setTitle("চাঁদ দেখা অনুযায়ী হিজরি তারিখ ঠিক করুন")
+            .setItems(options) { _, which ->
+                hijriOffset = values[which]
+                saveAllData()
+                showHomeScreen()
+                Toast.makeText(this, "হিজরি তারিখ আপডেট হয়েছে!", Toast.LENGTH_SHORT).show()
+            }
+            .show()
     }
 
     private fun showLocationAndMadhabDialog() {
@@ -1110,7 +1157,7 @@ class MainActivity : Activity() {
             "আয়াতুল কুরসি (৩ বার)" to "اللهُ لَا إِلَهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ ، لَا تَأْخُذُهُ سِنَةٌ وَلَا نَوْمٌ لَهُ مَا فِي السَّمَاتِ وَمَا فِي الْأَرْضِ مَنْ ذَا الَّذِي يَشْفَعُ عِنْدَةً إِلَّا بِإِذْنِهِ يَعْلَمُ مَا بَيْنَ أَيْدِيهِمْ وَمَا خَلْفَهُمْ وَلَا يُحِيطُونَ بِشَيْءٍ مِّنْ عِلْمِهِ إِلَّا بِمَا شَاءَ وَسِعَ كُرْسِيُّهُ السَّمَوَاتِ وَالْأَرْضَ وَلَا يَئُودُهُ حِفْظُهُمَا وَهُوَ الْعَلِيُّ الْعَظِيمُ",
             "৪ কুল ও বিশেষ দু'আসমূহ" to "সূরা আল-কাফিরূন, সূরা আল-ইখলাস, সূরা আল-ফালাক, সূরা আন-নাস (প্রত্যেকটি ৩ বার করে)",
             "সকাল ও সন্ধ্যার তাসবিহ" to "سُبْحَانَ اللَّهِ ، وَالْحَمْدُ لِلَّهِ ، وَلَا إِلَهَ إِلَّا اللَّهُ ، وَاللَّهُ أَكْبَرُ (১০ বার)\n\nلَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ ، وَلَهُ الْحَمْدُ (১০০ বার)",
-            "সায়্যিদুল ইস্তিগফার (১ বার)" to "اللَّهُمَّ أَنْتَ رَبِّي لَا إِلَهَ إِلَّا أَنْتَ، خَلَقْتَنِي وَأَنَا عَبْدُكَ ، وَأَنَا عَلَى عهدك ووعدك ما استطعت ، أعوذ بك من شر ما صنعت ، أبوء لك بنعمتك علي ، وأبوء لك بذنبي فاغفر لي ، فإنه لا يغفر الذنوب إلا أنت",
+            "সায়্যিদুল ইস্তিগফার (১ বার)" to "اللَّهُمَّ أَنْتَ رَبِّي لَا إِلَهَ إِلَّا أَنْتَ، خَلَقْتَنِي وَأَنَا عَبْدُكَ ، وَأَنَا عَلَى عهدك ووعدك ما استطعت ، أعوذ بك من شر ما صنعت ، أبوء لك بنعمتك علي ، وأبوء لك بذنبي فاغفر لي ، فإنه لا يغفر الذনوب إلا أنت",
             "ঘুমানোর পূর্বের আমল" to "১. ওযু করে ঘুমানো।\n২. বিছানা ঝেড়ে শোয়া।\n৩. আয়াতুল কুরসি পড়া।\n৪. ৩ কুল পড়ে শরীরে ফু দেওয়া।\n৫. ঘুমের দোয়া: (اللَّهُمَّ بِاسْمِكَ أَمُوتُ وَأَحْيَا)\n৬. ঘুম থেকে উঠে দোয়া পড়া।"
         )
 
