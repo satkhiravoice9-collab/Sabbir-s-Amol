@@ -247,27 +247,10 @@ class MainActivity : Activity() {
     private fun promptGoogleAccountPicker() {
         try {
             val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                AccountManager.newChooseAccountIntent(
-                    null,
-                    null,
-                    arrayOf("com.google"),
-                    null,
-                    null,
-                    null,
-                    null
-                )
+                AccountManager.newChooseAccountIntent(null, null, arrayOf("com.google"), null, null, null, null)
             } else {
                 @Suppress("DEPRECATION")
-                AccountManager.newChooseAccountIntent(
-                    null,
-                    null,
-                    arrayOf("com.google"),
-                    false,
-                    null,
-                    null,
-                    null,
-                    null
-                )
+                AccountManager.newChooseAccountIntent(null, null, arrayOf("com.google"), false, null, null, null, null)
             }
             startActivityForResult(intent, GOOGLE_ACCOUNT_PICKER_REQUEST)
         } catch (e: ActivityNotFoundException) {
@@ -444,21 +427,29 @@ class MainActivity : Activity() {
         val offset = if (selectedDistrict.contains("সাতক্ষীরা")) 4 else if (selectedDistrict.contains("ঢাকা")) 0 else 2
         val asrExtra = if (selectedMadhab == "হানাফী") 45 else 0
 
+        val sehriEnd = 4 * 60 + 19 + offset
         val fojrEnd = 5 * 60 + 43 + offset
+        val sunriseHaramEnd = 6 * 60 + 3 + offset
         val ishraqEnd = 6 * 60 + 30 + offset
         val chashtEnd = 11 * 60 + 45 + offset
+        val middayHaramEnd = 12 * 60 + 7 + offset
         val zohrEnd = 16 * 60 + 36 + offset + asrExtra
-        val asrEnd = 18 * 60 + 26 + offset
+        val asrEnd = 18 * 60 + 10 + offset
+        val sunsetHaramEnd = 18 * 60 + 26 + offset
         val magribEnd = 19 * 60 + 43 + offset
 
         val (waqtName, targetMin) = when {
-            currentMinutes < fojrEnd -> "ফজর" to fojrEnd
-            currentMinutes < ishraqEnd -> "ইশরাক" to ishraqEnd
-            currentMinutes < chashtEnd -> "চাশত / দুহা" to chashtEnd
-            currentMinutes < zohrEnd -> "যোহর" to zohrEnd
-            currentMinutes < asrEnd -> "আসর ($selectedMadhab)" to asrEnd
-            currentMinutes < magribEnd -> "মাগরিব" to magribEnd
-            else -> "এশা" to (24 * 60 + fojrEnd)
+            currentMinutes < sehriEnd -> "সাহরির শেষ সময় বাকি" to sehriEnd
+            currentMinutes < fojrEnd -> "ফজর ওয়াক্ত শেষ হতে বাকি" to fojrEnd
+            currentMinutes < sunriseHaramEnd -> "🚫 সূর্যোদয় (নামাজ নিষিদ্ধ সময়)" to sunriseHaramEnd
+            currentMinutes < ishraqEnd -> "ইশরাক শেষ হতে বাকি" to ishraqEnd
+            currentMinutes < chashtEnd -> "চাশত / দুহা শেষ হতে বাকি" to chashtEnd
+            currentMinutes < middayHaramEnd -> "🚫 দ্বিপ্রহর (নামাজ নিষিদ্ধ সময়)" to middayHaramEnd
+            currentMinutes < zohrEnd -> "যোহর শেষ হতে বাকি" to zohrEnd
+            currentMinutes < asrEnd -> "আসর ($selectedMadhab) শেষ হতে বাকি" to asrEnd
+            currentMinutes < sunsetHaramEnd -> "🚫 সূর্যাস্ত (নামাজ নিষিদ্ধ সময়)" to sunsetHaramEnd
+            currentMinutes < magribEnd -> "মাগরিব / ইফতারের ওয়াক্ত বাকি" to magribEnd
+            else -> "তাহাজ্জুদ ও সাহরির সময়" to (24 * 60 + sehriEnd)
         }
 
         var diffSec = (targetMin * 60) - (currentMinutes * 60 + currentSeconds)
@@ -469,20 +460,21 @@ class MainActivity : Activity() {
         val s = diffSec % 60
 
         val timeString = String.format("%02d:%02d:%02d", h, m, s)
-        liveWaqtTextView?.text = "$waqtName শেষ হতে বাকি"
+        liveWaqtTextView?.text = waqtName
         liveTimerTextView?.text = toBangla(timeString)
     }
 
     private fun showHomeScreen() {
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = getThemeBackground() }
         val scroll = ScrollView(this).apply { layoutParams = LinearLayout.LayoutParams(-1, 0, 1f) }
-        val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(26, 26, 26, 26) }
+        val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(24, 24, 24, 24) }
         val accent = getAccentColor()
 
+        // লাইভ কাউন্টডাউন কার্ড
         val timerCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(28, 24, 28, 24)
+            setPadding(26, 22, 26, 22)
             val bg = GradientDrawable()
             bg.setColor(if (isWhiteTheme()) Color.parseColor("#FFFBEB") else Color.parseColor("#1B2E24"))
             bg.cornerRadius = 30f
@@ -492,7 +484,7 @@ class MainActivity : Activity() {
 
         liveWaqtTextView = TextView(this).apply {
             text = "ওয়াক্ত শেষ হতে বাকি"
-            textSize = 16f
+            textSize = 15.5f
             typeface = Typeface.SERIF
             setTextColor(getTextColor())
             setTypeface(Typeface.SERIF, Typeface.BOLD)
@@ -501,17 +493,17 @@ class MainActivity : Activity() {
 
         liveTimerTextView = TextView(this).apply {
             text = "০০:০০:০০"
-            textSize = 44f
+            textSize = 42f
             typeface = Typeface.SERIF
             setTextColor(accent)
             setTypeface(Typeface.SERIF, Typeface.BOLD)
             gravity = Gravity.CENTER
-            setPadding(0, 6, 0, 10)
+            setPadding(0, 4, 0, 8)
         }
 
         val locationBox = TextView(this).apply {
             text = "📍 $selectedUnion, $selectedThana, $selectedDistrict, $selectedDivision"
-            textSize = 12.5f
+            textSize = 12f
             typeface = Typeface.SERIF
             setTextColor(getTextColor())
             gravity = Gravity.CENTER
@@ -533,26 +525,68 @@ class MainActivity : Activity() {
         timerCard.addView(btnChangeLoc)
         content.addView(timerCard)
 
+        val offset = if (selectedDistrict.contains("সাতক্ষীরা")) 4 else if (selectedDistrict.contains("ঢাকা")) 0 else 2
+
+        // ১. সাহরি, ইফতার ও তাহাজ্জুদ কার্ড
+        val specialCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(20, 16, 20, 16)
+            val bg = GradientDrawable()
+            bg.setColor(if (isWhiteTheme()) Color.parseColor("#FEF3C7") else Color.parseColor("#1E3A2F"))
+            bg.cornerRadius = 24f
+            bg.setStroke(2, accent)
+            background = bg
+            val lp = LinearLayout.LayoutParams(-1, -2)
+            lp.setMargins(0, 16, 0, 0)
+            layoutParams = lp
+        }
+
+        val spTitle = TextView(this).apply {
+            text = "🌙 সাহরি, ইফতার ও তাহাজ্জুদ সময়সূচী"
+            textSize = 15.5f
+            typeface = Typeface.SERIF
+            setTextColor(getTextColor())
+            setTypeface(Typeface.SERIF, Typeface.BOLD)
+            setPadding(0, 0, 0, 8)
+        }
+        specialCard.addView(spTitle)
+
+        val spTimes = listOf(
+            "সাহরির শেষ সময়" to "${formatBanglaTime(4, 19 + offset)} মি.",
+            "ইফতারের সময়" to "${formatBanglaTime(6, 27 + offset)} মি.",
+            "তাহাজ্জুদের উত্তম সময়" to "রাত ০১:৩০ হতে সাহরির পূর্ব পর্যন্ত"
+        )
+        for (st in spTimes) {
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, 4, 0, 4) }
+            val name = TextView(this).apply { text = st.first; setTextColor(getTextColor()); textSize = 13.5f; typeface = Typeface.SERIF; layoutParams = LinearLayout.LayoutParams(0, -2, 1f) }
+            val time = TextView(this).apply { text = st.second; setTextColor(if (isWhiteTheme()) Color.parseColor("#B45309") else Color.parseColor("#FDE047")); textSize = 13.5f; typeface = Typeface.SERIF; setTypeface(Typeface.SERIF, Typeface.BOLD) }
+            row.addView(name)
+            row.addView(time)
+            specialCard.addView(row)
+        }
+        content.addView(specialCard)
+
+        // ২. নামাজের ৫ ওয়াক্তের সময়সূচী
         val prayerCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(22, 18, 22, 18)
+            setPadding(20, 16, 20, 16)
             val bg = GradientDrawable()
             bg.setColor(getCardBgColor())
             bg.cornerRadius = 24f
             bg.setStroke(1, Color.parseColor("#CBD5E1"))
             background = bg
             val lp = LinearLayout.LayoutParams(-1, -2)
-            lp.setMargins(0, 18, 0, 0)
+            lp.setMargins(0, 14, 0, 0)
             layoutParams = lp
         }
 
         val pTitle = TextView(this).apply {
-            text = "আজকের নামাজের সময়সূচী ($selectedDistrict | $selectedMadhab)"
-            textSize = 16f
+            text = "🕌 ৫ ওয়াক্ত নামাজের সময় ($selectedMadhab মাযহাব)"
+            textSize = 15.5f
             typeface = Typeface.SERIF
             setTextColor(accent)
             setTypeface(Typeface.SERIF, Typeface.BOLD)
-            setPadding(0, 0, 0, 10)
+            setPadding(0, 0, 0, 8)
         }
         prayerCard.addView(pTitle)
 
@@ -562,21 +596,62 @@ class MainActivity : Activity() {
         val times = listOf(
             "ফজর" to "${formatBanglaTime(4, 25)} - ${formatBanglaTime(5, 43)} মি.",
             "যোহর" to "${formatBanglaTime(12, 8)} - ${formatBanglaTime(asrStartHour, asrStartMin - 1)} মি.",
-            "আসর ($selectedMadhab)" to "${formatBanglaTime(asrStartHour, asrStartMin)} - ${formatBanglaTime(6, 26)} মি.",
-            "মাগরিব (ইফতার)" to "${formatBanglaTime(6, 27)} - ${formatBanglaTime(7, 43)} মি.",
+            "আসর ($selectedMadhab)" to "${formatBanglaTime(asrStartHour, asrStartMin)} - ${formatBanglaTime(6, 10)} মি.",
+            "মাগরিব" to "${formatBanglaTime(6, 27)} - ${formatBanglaTime(7, 43)} মি.",
             "এশা ও বিতর" to "${formatBanglaTime(7, 44)} - ${formatBanglaTime(4, 24)} মি."
         )
 
         for (t in times) {
-            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, 7, 0, 7) }
-            val name = TextView(this).apply { text = t.first; setTextColor(getTextColor()); textSize = 14.5f; typeface = Typeface.SERIF; layoutParams = LinearLayout.LayoutParams(0, -2, 1f) }
-            val time = TextView(this).apply { text = t.second; setTextColor(if (isWhiteTheme()) Color.parseColor("#059669") else Color.parseColor("#86EFAC")); textSize = 14.5f; typeface = Typeface.SERIF; setTypeface(Typeface.SERIF, Typeface.BOLD) }
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, 5, 0, 5) }
+            val name = TextView(this).apply { text = t.first; setTextColor(getTextColor()); textSize = 14f; typeface = Typeface.SERIF; layoutParams = LinearLayout.LayoutParams(0, -2, 1f) }
+            val time = TextView(this).apply { text = t.second; setTextColor(if (isWhiteTheme()) Color.parseColor("#059669") else Color.parseColor("#86EFAC")); textSize = 14f; typeface = Typeface.SERIF; setTypeface(Typeface.SERIF, Typeface.BOLD) }
             row.addView(name)
             row.addView(time)
             prayerCard.addView(row)
         }
         content.addView(prayerCard)
 
+        // ৩. নামাজ নিষিদ্ধ (হারাম) ৩টি সময়সূচী কার্ড
+        val haramCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(20, 16, 20, 16)
+            val bg = GradientDrawable()
+            bg.setColor(if (isWhiteTheme()) Color.parseColor("#FEF2F2") else Color.parseColor("#331818"))
+            bg.cornerRadius = 24f
+            bg.setStroke(1, Color.parseColor("#EF4444"))
+            background = bg
+            val lp = LinearLayout.LayoutParams(-1, -2)
+            lp.setMargins(0, 14, 0, 0)
+            layoutParams = lp
+        }
+
+        val hTitle = TextView(this).apply {
+            text = "🚫 নামাজ নিষিদ্ধ ৩টি হারাম ওয়াক্ত"
+            textSize = 15f
+            typeface = Typeface.SERIF
+            setTextColor(Color.parseColor("#EF4444"))
+            setTypeface(Typeface.SERIF, Typeface.BOLD)
+            setPadding(0, 0, 0, 6)
+        }
+        haramCard.addView(hTitle)
+
+        val haramTimes = listOf(
+            "১. সূর্যোদয়কালীন সময়" to "${formatBanglaTime(5, 44 + offset)} - ${formatBanglaTime(6, 4 + offset)} মি.",
+            "২. ঠিক দ্বিপ্রহরের সময়" to "${formatBanglaTime(11, 48 + offset)} - ${formatBanglaTime(12, 7 + offset)} মি.",
+            "৩. সূর্যাস্তকালীন সময়" to "${formatBanglaTime(6, 11 + offset)} - ${formatBanglaTime(6, 26 + offset)} মি."
+        )
+
+        for (ht in haramTimes) {
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, 4, 0, 4) }
+            val name = TextView(this).apply { text = ht.first; setTextColor(getTextColor()); textSize = 13f; typeface = Typeface.SERIF; layoutParams = LinearLayout.LayoutParams(0, -2, 1f) }
+            val time = TextView(this).apply { text = ht.second; setTextColor(Color.parseColor("#EF4444")); textSize = 13f; typeface = Typeface.SERIF; setTypeface(Typeface.SERIF, Typeface.BOLD) }
+            row.addView(name)
+            row.addView(time)
+            haramCard.addView(row)
+        }
+        content.addView(haramCard)
+
+        // ডিজিটাল তাসবিহ ও ফোল্ডার বাটন
         val btnTasbih = Button(this).apply {
             text = "📿 ডিজিটাল তাসবিহ চালু করুন"
             setBackgroundColor(accent)
@@ -598,7 +673,7 @@ class MainActivity : Activity() {
             textSize = 14.5f
             typeface = Typeface.SERIF
             val lp = LinearLayout.LayoutParams(-1, -2)
-            lp.setMargins(0, 12, 0, 0)
+            lp.setMargins(0, 10, 0, 0)
             layoutParams = lp
             setOnClickListener { openScreen("amal_folders") }
         }
@@ -861,7 +936,7 @@ class MainActivity : Activity() {
 
         val items = listOf(
             "সূরা আল-ফাতিহা (৩ বার)" to "بِسْمِ اللهِ الرَّحْمَنِ الرَّحِيمِ (1) الْحَمْدُ لِلَّهِ رَبِّ الْعَلَمِينَ (٢) الرَّحْمَنِ الرَّحِيمِ (۳) مَلِكِ يَوْمِ الدِّينِ (4) إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ (٥) اِهْدِنَا الصِّرَاطَ الْمُسْتَقِيمَ (6) صِرَاطَ الَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ الْمَغْضُوبِ عَلَيْهِمْ وَلَا الضَّالِّينَ (۷)",
-            "আয়াতুল কুরসি (৩ বার)" to "اللهُ لَا إِلَهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ ، لَا تَأْخُذُهُ سِنَةٌ وَلَا نَوْمٌ لَهُ مَا فِي السَّمَاتِ وَمَا فِي الْأَرْضِ مَنْ ذَا الَّذِي يَشْفَعُ عِنْدَةً إِلَّا بِإِذْنِهِ يَعْلَمُ مَا بَيْنَ أَيْদِيهِمْ وَمَا خَلْفَهُمْ وَلَا يُحِيطُونَ بِشَيْءٍ مِّنْ عِلْمِهِ إِلَّا بِمَا شَاءَ وَسِعَ كُرْسِيُّهُ السَّمَوَاتِ وَالْأَرْضَ وَلَا يَئُودُهُ حِفْظُهُمَا وَهُوَ الْعَلِيُّ الْعَظِيمُ",
+            "আয়াতুল কুরসি (৩ বার)" to "اللهُ لَا إِلَهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ ، لَا تَأْخُذُهُ سِنَةٌ وَلَا نَوْمٌ لَهُ مَا فِي السَّمَاتِ وَمَا فِي الْأَرْضِ مَنْ ذَا الَّذِي يَشْفَعُ عِنْدَةً إِلَّا بِإِذْنِهِ يَعْلَمُ مَا بَيْنَ أَيْدِيهِمْ وَمَا خَلْفَهُمْ وَلَا يُحِيطُونَ بِشَيْءٍ مِّنْ عِلْمِهِ إِلَّا بِمَا شَاءَ وَسِعَ كُرْسِيُّهُ السَّمَوَاتِ وَالْأَرْضَ وَلَا يَئُودُهُ حِفْظُهُمَا وَهُوَ الْعَلِيُّ الْعَظِيمُ",
             "৪ কুল ও বিশেষ দু'আসমূহ" to "সূরা আল-কাফিরূন, সূরা আল-ইখলাস, সূরা আল-ফালাক, সূরা আন-নাস (প্রত্যেকটি ৩ বার করে)",
             "সকাল ও সন্ধ্যার তাসবিহ" to "سُبْحَانَ اللَّهِ ، وَالْحَمْدُ لِلَّهِ ، وَلَا إِلَهَ إِلَّا اللَّهُ ، وَاللَّهُ أَكْبَرُ (১০ বার)\n\nلَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ ، وَلَهُ الْحَمْدُ (১০০ বার)",
             "সায়্যিদুল ইস্তিগফার (১ বার)" to "اللَّهُمَّ أَنْتَ رَبِّي لَا إِلَهَ إِلَّا أَنْتَ، خَلَقْتَنِي وَأَنَا عَبْدُكَ ، وَأَنَا عَلَى عهدك ووعدك ما استطعت ، أعوذ بك من شر ما صنعت ، أبوء لك بنعمتك علي ، وأبوء لك بذنبي فاغفر لي ، فإنه لا يغفر الذنوب إلا أنت",
@@ -903,7 +978,7 @@ class MainActivity : Activity() {
 
         val manzilAyats = listOf(
             "১. সূরা আল-ইনশিকাক (১-২৫)" to "بِسْمِ اللهِ الرَّحْمَنِ الرَّحِيمِ\nإِذَا السَّمَاءُ انْشَقَّتْ ، وَأَذِنَتْ لِرَبِّهَا وَحُقَّتْ ، وَإِذَا الْأَرْضُ مُدَّتْ وَأَلْقَتْ مَا فِيهَا وَتَخَلَّتْ ، وَأَذِنَتْ لِرَبِّهَا وَحُقَّتْ ، يَأَيُّهَا الْإِنْسَانُ إِنَّكَ كَادِحٌ إِلَى رَبِّكَ كَدْحًا فَمُلَقِيهِ...",
-            "২. সূরা আল-ফাতিহা ও আল-বাকারাহ (১-৫)" to "بِسْمِ اللهِ الرَّحْمَنِ الرَّحِيمِ\nالْحَمْدُ لِلَّهِ رَبِّ الْعَلَمِينَ ، الرَّحْمَنِ الرَّحِيمِ ، مَلِكِ يَوْمِ الدِّينِ...\n\nالم ، ذَلِكَ الْكِتَبُ لَا رَيْبَ فِيهِ هُدًى لِلْمُتَّقِينَ...",
+            "২. সূরা আল-ফাতিহা ও আল-বাকারাহ (১-৫)" to "بِسْمِ اللهِ الرَّحْمَنِ الرَّحِيمِ\nالْحَمْدُ لِلَّهِ رَبِّ الْعَلَمِينَ ، الرَّحْمَنِ الرَّحِيمِ ، مَلِكِ יَوْمِ الدِّينِ...\n\nالم ، ذَلِكَ الْكِتَبُ لَا رَيْبَ فِيهِ هُدًى لِلْمُتَّقِينَ...",
             "৩. আয়াতুল কুরসি ও আমানার রাসুল" to "اللهُ لَا إِلَهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ...\n\nآمَنَ الرَّسُولُ بِمَا أُنْزِلَ إِلَيْهِ مِنْ رَّبِّهِ وَالْمُؤْمِنُونَ...",
             "৪. সূরা আলে ইমরান, আল-আ'রাফ ও আল-ইসরা" to "شَهِدَ اللَّهُ أَنَّهُ لَا إِلَهَ إِلَّا هُوَ وَالْمَلَئِكَةُ...\n\nإِنَّ رَبَّكُمُ اللَّهُ الَّذِي خَلَقَ السَّمَوَاتِ وَالْأَرْضَ...",
             "৫. সূরা আস-সাফফাত, আল-হাশর ও আল-জিন" to "وَالصَّافَّاتِ صَفًّا ، فَالزَّاجِرَاتِ زَجْرًا...\n\nلَوْ أَنْزَلْنَا هَذَا الْقُرْآنَ عَلَى جَبَلٍ لَرَأَيْتَهُ خَاشِعًا...\n\nقُلْ أُوحِيَ إِلَيَّ أَنَّهُ اسْتَمَعَ نَفَرٌ مِنَ الْجِنِّ..."
