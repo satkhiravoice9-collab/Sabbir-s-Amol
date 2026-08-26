@@ -33,20 +33,29 @@ import java.time.temporal.ChronoField
 import java.util.*
 import kotlin.concurrent.thread
 
-data class ZikrItem(val id: String, var name: String, var count: Int, var target: Int)
+data class ZikrItem(
+    val id: String,
+    var name: String,
+    var count: Int,
+    var target: Int,
+    var scheduleHour: Int = 7,
+    var scheduleMinute: Int = 0,
+    var isAlarmEnabled: Boolean = false
+)
+
 data class NoteItem(val id: String, var title: String, var content: String, val date: String)
 
 class PrayerAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val title = intent.getStringExtra("title") ?: "নামাজের ওয়াক্ত হয়েছে"
-        val message = intent.getStringExtra("message") ?: "নামাজের জন্য প্রস্তুতি নিন।"
+        val title = intent.getStringExtra("title") ?: "জিকির ও আমলের সময় হয়েছে"
+        val message = intent.getStringExtra("message") ?: "আপনার নির্ধারিত জিকিরটি আদায় করে নিন।"
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val channelId = "prayer_alarm_channel"
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(channelId, "নামাজের অ্যালার্ম", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "নামাজের ওয়াক্তের অ্যালার্ম নোটিফিকেশন"
+            val channel = NotificationChannel(channelId, "ইসলামিক অ্যালার্ম", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "নামাজ ও জিকিরের অ্যালার্ম নোটিফিকেশন"
                 enableVibration(true)
             }
             notificationManager.createNotificationChannel(channel)
@@ -112,9 +121,27 @@ class MainActivity : Activity() {
         var m = minute
         while (m >= 60) { h += 1; m -= 60 }
         while (m < 0) { h -= 1; m += 60 }
+        val amPm = if (h < 12) "AM" else "PM"
         if (h > 12) h -= 12
         if (h == 0) h = 12
-        return "${toBangla(String.format("%02d", h))}:${toBangla(String.format("%02d", minute % 60))}"
+        return "${toBangla(String.format("%02d", h))}:${toBangla(String.format("%02d", m))} $amPm"
+    }
+
+    private fun checkAndResetTasbihCount() {
+        val now = Calendar.getInstance()
+        val yyyyMMdd = SimpleDateFormat("yyyyMMdd", Locale.US).format(now.time)
+        val hour24 = now.get(Calendar.HOUR_OF_DAY)
+        val slot = if (hour24 < 12) "night" else "noon"
+        val currentSlotKey = "${yyyyMMdd}_$slot"
+
+        val lastResetSlot = prefs.getString("last_tasbih_reset_slot", "") ?: ""
+        if (lastResetSlot != currentSlotKey) {
+            for (item in zikrList) {
+                item.count = 0
+            }
+            prefs.edit().putString("last_tasbih_reset_slot", currentSlotKey).apply()
+            saveAllData()
+        }
     }
 
     private fun getCombinedIslamicDate(): Triple<String, String, String> {
@@ -148,14 +175,10 @@ class MainActivity : Activity() {
         }
         val hDate = "${toBangla(hDay)} ${arabicMonths[(hMonth - 1).coerceIn(0, 11)]}, ${toBangla(hYear)} হিজরি"
 
-        // নির্ভুল বাংলা ক্যালেন্ডার
         val bnMonthNames = arrayOf("বৈশাখ", "জ্যৈষ্ঠ", "আষাঢ়", "শ্রাবণ", "ভাদ্র", "আশ্বিন", "কার্তিক", "অগ্রহায়ণ", "পৌষ", "মাঘ", "ফাল্গুন", "চৈত্র")
         val monthDays = intArrayOf(31, 31, 31, 31, 31, 30, 30, 30, 30, 30, 29, 30)
         
         val gYear = now.get(Calendar.YEAR)
-        val gMonth = now.get(Calendar.MONTH) // 0-based
-        val gDay = now.get(Calendar.DAY_OF_MONTH)
-        
         var bYear = gYear - 593
         val isLeapYear = (gYear % 4 == 0 && gYear % 100 != 0) || (gYear % 400 == 0)
         if (isLeapYear) monthDays[10] = 30
@@ -185,6 +208,7 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         loadAllData()
+        checkAndResetTasbihCount()
         openScreen("home")
     }
 
@@ -206,7 +230,17 @@ class MainActivity : Activity() {
                 val array = JSONArray(savedZikr)
                 for (i in 0 until array.length()) {
                     val obj = array.getJSONObject(i)
-                    zikrList.add(ZikrItem(obj.getString("id"), obj.getString("name"), obj.getInt("count"), obj.getInt("target")))
+                    zikrList.add(
+                        ZikrItem(
+                            obj.getString("id"),
+                            obj.getString("name"),
+                            obj.getInt("count"),
+                            obj.getInt("target"),
+                            obj.optInt("scheduleHour", 7),
+                            obj.optInt("scheduleMinute", 0),
+                            obj.optBoolean("isAlarmEnabled", false)
+                        )
+                    )
                 }
             } catch (e: Exception) { initDefaultZikr() }
         } else { initDefaultZikr() }
@@ -229,11 +263,11 @@ class MainActivity : Activity() {
     }
 
     private fun initDefaultZikr() {
-        zikrList.add(ZikrItem("1", "সুবহানাল্লাহ (SubhanAllah)", 0, 33))
-        zikrList.add(ZikrItem("2", "আলহামদুলিল্লাহ (Alhamdulillah)", 0, 33))
-        zikrList.add(ZikrItem("3", "আল্লাহু আকবার (Allahu Akbar)", 0, 34))
-        zikrList.add(ZikrItem("4", "আস্তাগফিরুল্লাহ (Astaghfirullah)", 0, 100))
-        zikrList.add(ZikrItem("5", "আয়াতুল কুরসি (Ayatul Kursi)", 0, 7))
+        zikrList.add(ZikrItem("1", "সুবহানাল্লাহ (SubhanAllah)", 0, 33, 7, 0, false))
+        zikrList.add(ZikrItem("2", "আলহামদুলিল্লাহ (Alhamdulillah)", 0, 33, 13, 0, false))
+        zikrList.add(ZikrItem("3", "আল্লাহু আকবার (Allahu Akbar)", 0, 34, 17, 0, false))
+        zikrList.add(ZikrItem("4", "আস্তাগফিরুল্লাহ (Astaghfirullah)", 0, 100, 19, 0, false))
+        zikrList.add(ZikrItem("5", "আয়াতুল কুরসি (Ayatul Kursi)", 0, 7, 21, 0, false))
         saveAllData(uploadToCloud = false)
     }
 
@@ -245,6 +279,9 @@ class MainActivity : Activity() {
                 put("name", item.name)
                 put("count", item.count)
                 put("target", item.target)
+                put("scheduleHour", item.scheduleHour)
+                put("scheduleMinute", item.scheduleMinute)
+                put("isAlarmEnabled", item.isAlarmEnabled)
             }
             zikrArray.put(obj)
         }
@@ -328,7 +365,17 @@ class MainActivity : Activity() {
                                 zikrList.clear()
                                 for (i in 0 until zArray.length()) {
                                     val zObj = zArray.getJSONObject(i)
-                                    zikrList.add(ZikrItem(zObj.getString("id"), zObj.getString("name"), zObj.getInt("count"), zObj.getInt("target")))
+                                    zikrList.add(
+                                        ZikrItem(
+                                            zObj.getString("id"),
+                                            zObj.getString("name"),
+                                            zObj.getInt("count"),
+                                            zObj.getInt("target"),
+                                            zObj.optInt("scheduleHour", 7),
+                                            zObj.optInt("scheduleMinute", 0),
+                                            zObj.optBoolean("isAlarmEnabled", false)
+                                        )
+                                    )
                                 }
                             }
                             if (noteStr.isNotEmpty()) {
@@ -350,7 +397,7 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun setPrayerAlarm(reqCode: Int, hour: Int, minute: Int, title: String, message: String, isEnable: Boolean) {
+    private fun setCustomAlarm(reqCode: Int, hour: Int, minute: Int, title: String, message: String, isEnable: Boolean) {
         val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val intent = Intent(this, PrayerAlarmReceiver::class.java).apply {
             putExtra("title", title)
@@ -548,13 +595,16 @@ class MainActivity : Activity() {
         timerRunnable?.let { timerHandler.removeCallbacks(it) }
     }
 
-    // ১০০% নির্ভুল লাইভ কাউন্টডাউন ও ওয়াক্ত ক্যালকুলেশন
     private fun updateCountdown() {
         val now = Calendar.getInstance()
         val hour24 = now.get(Calendar.HOUR_OF_DAY)
         val min = now.get(Calendar.MINUTE)
         val sec = now.get(Calendar.SECOND)
         val currentMinutes = hour24 * 60 + min
+
+        if ((hour24 == 0 && min == 0 && sec <= 2) || (hour24 == 12 && min == 0 && sec <= 2)) {
+            checkAndResetTasbihCount()
+        }
 
         var h12 = hour24 % 12
         if (h12 == 0) h12 = 12
@@ -567,7 +617,6 @@ class MainActivity : Activity() {
 
         val offset = if (selectedDistrict.contains("সাতক্ষীরা")) 4 else if (selectedDistrict.contains("ঢাকা")) 0 else 2
 
-        // প্রতিটি ওয়াক্তের সুনির্দিষ্ট শুরুর মিনিট
         val sehriEnd = 4 * 60 + 19 + offset
         val fojrStart = 4 * 60 + 25 + offset
         val fojrEnd = 5 * 60 + 43 + offset
@@ -577,7 +626,6 @@ class MainActivity : Activity() {
         val middayHaramEnd = 12 * 60 + 8 + offset
         val zohrStart = 12 * 60 + 8 + offset
         
-        // আসর শুরুর মিনিট (যোহর শেষ হওয়ার ঠিক সমান)
         val asrStartHour = if (selectedMadhab == "হানাফী") 16 else 15
         val asrStartMin = if (selectedMadhab == "হানাফী") 37 else 52
         val asrStartTotalMin = asrStartHour * 60 + asrStartMin + offset
@@ -762,8 +810,8 @@ class MainActivity : Activity() {
         specialCard.addView(spTitle)
 
         val spTimes = listOf(
-            "সাহরির শেষ সময়" to "${formatBanglaTime(4, 19 + offset)} মি.",
-            "ইফতারের সময়" to "${formatBanglaTime(6, 27 + offset)} মি.",
+            "সাহরির শেষ সময়" to "${formatBanglaTime(4, 19 + offset)}",
+            "ইফতারের সময়" to "${formatBanglaTime(6, 27 + offset)}",
             "তাহাজ্জুদের উত্তম সময়" to "রাত ০১:৩০ হতে সাহরির পূর্ব পর্যন্ত"
         )
         for (st in spTimes) {
@@ -803,11 +851,11 @@ class MainActivity : Activity() {
         val asrStartMinDisplay = if (selectedMadhab == "হানাফী") 37 else 52
 
         val prayerAlarmList = listOf(
-            Triple("ফজর", "${formatBanglaTime(4, 25 + offset)} মি.", Pair(4, 25 + offset)),
-            Triple("যোহর", "${formatBanglaTime(12, 8 + offset)} মি.", Pair(12, 8 + offset)),
-            Triple("আসর", "${formatBanglaTime(asrStartHourDisplay, asrStartMinDisplay + offset)} মি.", Pair(if (asrStartHourDisplay < 12) asrStartHourDisplay + 12 else asrStartHourDisplay, asrStartMinDisplay + offset)),
-            Triple("মাগরিব", "${formatBanglaTime(6, 27 + offset)} মি.", Pair(18, 27 + offset)),
-            Triple("এশা", "${formatBanglaTime(7, 44 + offset)} মি.", Pair(19, 44 + offset))
+            Triple("ফজর", "${formatBanglaTime(4, 25 + offset)}", Pair(4, 25 + offset)),
+            Triple("যোহর", "${formatBanglaTime(12, 8 + offset)}", Pair(12, 8 + offset)),
+            Triple("আসর", "${formatBanglaTime(asrStartHourDisplay, asrStartMinDisplay + offset)}", Pair(if (asrStartHourDisplay < 12) asrStartHourDisplay + 12 else asrStartHourDisplay, asrStartMinDisplay + offset)),
+            Triple("মাগরিব", "${formatBanglaTime(6, 27 + offset)}", Pair(18, 27 + offset)),
+            Triple("এশা", "${formatBanglaTime(7, 44 + offset)}", Pair(19, 44 + offset))
         )
 
         for ((idx, p) in prayerAlarmList.withIndex()) {
@@ -824,7 +872,7 @@ class MainActivity : Activity() {
                 isChecked = prefs.getBoolean(alarmKey, false)
                 setOnCheckedChangeListener { _, isChecked ->
                     prefs.edit().putBoolean(alarmKey, isChecked).apply()
-                    setPrayerAlarm(100 + idx, p.third.first, p.third.second, "${p.first} নামাজের ওয়াক্ত হয়েছে", "নামাজের জন্য প্রস্তুতি নিয়ে মসজিদে চলুন।", isChecked)
+                    setCustomAlarm(100 + idx, p.third.first, p.third.second, "${p.first} নামাজের ওয়াক্ত হয়েছে", "নামাজের জন্য প্রস্তুতি নিয়ে মসজিদে চলুন।", isChecked)
                     Toast.makeText(this@MainActivity, "${p.first} অ্যালার্ম " + (if (isChecked) "চালু হয়েছে" else "বন্ধ হয়েছে"), Toast.LENGTH_SHORT).show()
                 }
             }
@@ -860,9 +908,9 @@ class MainActivity : Activity() {
         haramCard.addView(hTitle)
 
         val haramTimes = listOf(
-            "১. সূর্যোদয়কালীন সময়" to "${formatBanglaTime(5, 44 + offset)} - ${formatBanglaTime(6, 4 + offset)} মি.",
-            "২. ঠিক দ্বিপ্রহরের সময়" to "${formatBanglaTime(11, 48 + offset)} - ${formatBanglaTime(12, 7 + offset)} মি.",
-            "৩. সূর্যাস্তকালীন সময়" to "${formatBanglaTime(6, 11 + offset)} - ${formatBanglaTime(6, 26 + offset)} মি."
+            "১. সূর্যোদয়কালীন সময়" to "${formatBanglaTime(5, 44 + offset)} - ${formatBanglaTime(6, 4 + offset)}",
+            "২. ঠিক দ্বিপ্রহরের সময়" to "${formatBanglaTime(11, 48 + offset)} - ${formatBanglaTime(12, 7 + offset)}",
+            "৩. সূর্যাস্তকালীন সময়" to "${formatBanglaTime(6, 11 + offset)} - ${formatBanglaTime(6, 26 + offset)}"
         )
 
         for (ht in haramTimes) {
@@ -1027,7 +1075,7 @@ class MainActivity : Activity() {
 
         val bottomBar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(24, 6, 24, 14) }
         val btnToList = Button(this).apply {
-            text = "📋 জিকির তালিকা ও কাস্টমাইজেশন"; layoutParams = LinearLayout.LayoutParams(0, -2, 1f); typeface = Typeface.SERIF
+            text = "📋 জিকির তালিকা ও শিডিউল"; layoutParams = LinearLayout.LayoutParams(0, -2, 1f); typeface = Typeface.SERIF
             setBackgroundColor(if (isWhiteTheme()) Color.parseColor("#0F766E") else Color.parseColor("#264536")); setTextColor(Color.WHITE)
             setOnClickListener { openScreen("zikr_list") }
         }
@@ -1038,13 +1086,14 @@ class MainActivity : Activity() {
         setContentView(root)
     }
 
+    // ৩. জিকির তালিকা স্ক্রিন (টাইম শিডিউল এবং এলার্মিং সুইচ সহ)
     private fun showZikrListScreen() {
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = getThemeBackground() }
         val scroll = ScrollView(this).apply { layoutParams = LinearLayout.LayoutParams(-1, 0, 1f) }
         val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(26, 26, 26, 26) }
         val accent = getAccentColor()
 
-        val title = TextView(this).apply { text = "জিকির তালিকা ও নতুন জিকির যোগ"; textSize = 19f; typeface = Typeface.SERIF; setTextColor(accent); setTypeface(Typeface.SERIF, Typeface.BOLD); setPadding(0, 0, 0, 14) }
+        val title = TextView(this).apply { text = "জিকির তালিকা ও অ্যালার্ম শিডিউল"; textSize = 19f; typeface = Typeface.SERIF; setTextColor(accent); setTypeface(Typeface.SERIF, Typeface.BOLD); setPadding(0, 0, 0, 14) }
         content.addView(title)
 
         val btnAddZikr = Button(this).apply {
@@ -1054,11 +1103,11 @@ class MainActivity : Activity() {
         }
         content.addView(btnAddZikr)
 
-        for (item in zikrList) {
+        for ((idx, item) in zikrList.withIndex()) {
             val card = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL; setPadding(18, 14, 18, 14)
                 val bg = GradientDrawable(); bg.setColor(getCardBgColor()); bg.cornerRadius = 20f; bg.setStroke(if (item.id == activeZikrId) 3 else 1, if (item.id == activeZikrId) accent else Color.parseColor("#CBD5E1")); background = bg
-                val lp = LinearLayout.LayoutParams(-1, -2); lp.setMargins(0, 0, 0, 12); layoutParams = lp
+                val lp = LinearLayout.LayoutParams(-1, -2); lp.setMargins(0, 0, 0, 14); layoutParams = lp
             }
 
             val topInfo = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
@@ -1069,14 +1118,64 @@ class MainActivity : Activity() {
             val nameView = TextView(this).apply { text = item.name; textSize = 15.5f; typeface = Typeface.SERIF; setTextColor(getTextColor()); setTypeface(Typeface.SERIF, Typeface.BOLD); val lp = LinearLayout.LayoutParams(0, -2, 1f); lp.setMargins(14, 0, 8, 0); layoutParams = lp }
             topInfo.addView(countBadge); topInfo.addView(nameView); card.addView(topInfo)
 
-            val targetText = TextView(this).apply { text = "টার্গেট: ${toBangla(item.target)} বার (গোণা হয়েছে: ${toBangla(item.count)} বার)"; textSize = 12.5f; typeface = Typeface.SERIF; setTextColor(getSecondaryTextColor()); setPadding(0, 6, 0, 10) }
+            val targetText = TextView(this).apply { text = "টার্গেট: ${toBangla(item.target)} বার (গোণা হয়েছে: ${toBangla(item.count)} বার)"; textSize = 12.5f; typeface = Typeface.SERIF; setTextColor(getSecondaryTextColor()); setPadding(0, 6, 0, 6) }
             card.addView(targetText)
 
-            val actionsRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.END }
-            val btnContinue = Button(this).apply {
-                text = "Continue"; textSize = 12.5f; typeface = Typeface.SERIF; setBackgroundColor(Color.parseColor("#2563EB")); setTextColor(Color.WHITE)
-                setOnClickListener { activeZikrId = item.id; saveAllData(); openScreen("tasbih") }
+            // শিডিউল টাইম ও অ্যালার্ম সুইচ রো
+            val scheduleRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, 4, 0, 10)
             }
+
+            val btnSetTime = Button(this).apply {
+                text = "⏰ শিডিউল: ${formatBanglaTime(item.scheduleHour, item.scheduleMinute)}"
+                textSize = 11.5f
+                typeface = Typeface.SERIF
+                setBackgroundColor(if (isWhiteTheme()) Color.parseColor("#E0F2FE") else Color.parseColor("#1E293B"))
+                setTextColor(if (isWhiteTheme()) Color.parseColor("#0369A1") else Color.parseColor("#38BDF8"))
+                val lp = LinearLayout.LayoutParams(0, -2, 1f)
+                layoutParams = lp
+                setOnClickListener {
+                    TimePickerDialog(this@MainActivity, { _, h, m ->
+                        item.scheduleHour = h
+                        item.scheduleMinute = m
+                        if (item.isAlarmEnabled) {
+                            setCustomAlarm(500 + idx, item.scheduleHour, item.scheduleMinute, "জিকিরের সময় হয়েছে", "${item.name} আদায়ের সময় হয়েছে।", true)
+                        }
+                        saveAllData()
+                        showZikrListScreen()
+                    }, item.scheduleHour, item.scheduleMinute, false).show()
+                }
+            }
+
+            val alarmSwitch = Switch(this).apply {
+                isChecked = item.isAlarmEnabled
+                val lp = LinearLayout.LayoutParams(-2, -2); lp.setMargins(10, 0, 0, 0); layoutParams = lp
+                setOnCheckedChangeListener { _, isChecked ->
+                    item.isAlarmEnabled = isChecked
+                    setCustomAlarm(500 + idx, item.scheduleHour, item.scheduleMinute, "জিকিরের সময় হয়েছে", "${item.name} আদায়ের সময় হয়েছে।", isChecked)
+                    saveAllData()
+                    Toast.makeText(this@MainActivity, "${item.name} এর অ্যালার্ম " + (if (isChecked) "চালু হয়েছে" else "বন্ধ হয়েছে"), Toast.LENGTH_SHORT).show()
+                }
+            }
+
+            scheduleRow.addView(btnSetTime)
+            scheduleRow.addView(alarmSwitch)
+            card.addView(scheduleRow)
+
+            val actionsRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.END }
+            
+            val btnEdit = Button(this).apply {
+                text = "✏️ Edit"
+                textSize = 12f
+                typeface = Typeface.SERIF
+                val lp = LinearLayout.LayoutParams(-2, -2); lp.setMargins(0, 0, 8, 0); layoutParams = lp
+                setBackgroundColor(if (isWhiteTheme()) Color.parseColor("#D97706") else Color.parseColor("#F59E0B"))
+                setTextColor(Color.BLACK)
+                setOnClickListener { showEditZikrDialog(item, idx) }
+            }
+
             val btnDelete = Button(this).apply {
                 text = "Delete"; textSize = 12f; typeface = Typeface.SERIF; val lp = LinearLayout.LayoutParams(-2, -2); lp.setMargins(0, 0, 8, 0); layoutParams = lp
                 setBackgroundColor(Color.parseColor("#DC2626")); setTextColor(Color.WHITE)
@@ -1084,6 +1183,7 @@ class MainActivity : Activity() {
                     if (zikrList.size <= 1) {
                         Toast.makeText(this@MainActivity, "কমপক্ষে একটি জিকির থাকতে হবে!", Toast.LENGTH_SHORT).show()
                     } else {
+                        setCustomAlarm(500 + idx, item.scheduleHour, item.scheduleMinute, "", "", false)
                         zikrList.remove(item)
                         if (activeZikrId == item.id) activeZikrId = zikrList.first().id
                         saveAllData()
@@ -1091,13 +1191,73 @@ class MainActivity : Activity() {
                     }
                 }
             }
-            actionsRow.addView(btnDelete); actionsRow.addView(btnContinue); card.addView(actionsRow); content.addView(card)
+
+            val btnContinue = Button(this).apply {
+                text = "Continue"; textSize = 12.5f; typeface = Typeface.SERIF; setBackgroundColor(Color.parseColor("#2563EB")); setTextColor(Color.WHITE)
+                setOnClickListener { activeZikrId = item.id; saveAllData(); openScreen("tasbih") }
+            }
+
+            actionsRow.addView(btnEdit)
+            actionsRow.addView(btnDelete)
+            actionsRow.addView(btnContinue)
+            card.addView(actionsRow)
+            content.addView(card)
         }
 
         scroll.addView(content)
         root.addView(scroll)
         root.addView(createNavBar("tasbih"))
         setContentView(root)
+    }
+
+    private fun showEditZikrDialog(item: ZikrItem, idx: Int) {
+        val layout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(40, 20, 40, 20) }
+
+        val labelName = TextView(this).apply { text = "জিকিরের নাম:"; typeface = Typeface.SERIF; setTextColor(getTextColor()) }
+        val nameInput = EditText(this).apply { setText(item.name); typeface = Typeface.SERIF }
+
+        val labelTarget = TextView(this).apply { text = "\nটার্গেট সংখ্যা:"; typeface = Typeface.SERIF; setTextColor(getTextColor()) }
+        val targetInput = EditText(this).apply {
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setText("${item.target}")
+            typeface = Typeface.SERIF
+        }
+
+        val labelCount = TextView(this).apply { text = "\nবর্তমান গোণার সংখ্যা (প্রয়োজনে রিসেট বা পরিবর্তন করুন):"; typeface = Typeface.SERIF; setTextColor(getTextColor()) }
+        val countInput = EditText(this).apply {
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setText("${item.count}")
+            typeface = Typeface.SERIF
+        }
+
+        layout.addView(labelName)
+        layout.addView(nameInput)
+        layout.addView(labelTarget)
+        layout.addView(targetInput)
+        layout.addView(labelCount)
+        layout.addView(countInput)
+
+        AlertDialog.Builder(this)
+            .setTitle("জিকির কাস্টমাইজ করুন")
+            .setView(layout)
+            .setPositiveButton("আপডেট করুন") { _, _ ->
+                val newName = nameInput.text.toString().trim()
+                val newTarget = targetInput.text.toString().toIntOrNull() ?: item.target
+                val newCount = countInput.text.toString().toIntOrNull() ?: item.count
+                if (newName.isNotEmpty()) {
+                    item.name = newName
+                    item.target = if (newTarget > 0) newTarget else 33
+                    item.count = if (newCount >= 0) newCount else 0
+                    if (item.isAlarmEnabled) {
+                        setCustomAlarm(500 + idx, item.scheduleHour, item.scheduleMinute, "জিকিরের সময় হয়েছে", "${item.name} আদায়ের সময় হয়েছে।", true)
+                    }
+                    saveAllData()
+                    showZikrListScreen()
+                    Toast.makeText(this, "সফলভাবে আপডেট হয়েছে!", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("বাতিল", null)
+            .show()
     }
 
     private fun showAddZikrDialog() {
@@ -1114,7 +1274,7 @@ class MainActivity : Activity() {
                 val name = nameInput.text.toString().trim()
                 val target = targetInput.text.toString().toIntOrNull() ?: 33
                 if (name.isNotEmpty()) {
-                    val newItem = ZikrItem(UUID.randomUUID().toString(), name, 0, if (target > 0) target else 33)
+                    val newItem = ZikrItem(UUID.randomUUID().toString(), name, 0, if (target > 0) target else 33, 7, 0, false)
                     zikrList.add(newItem)
                     activeZikrId = newItem.id
                     saveAllData()
@@ -1176,9 +1336,9 @@ class MainActivity : Activity() {
             "সূরা আল-ফাতিহা (৩ বার)" to "بِسْمِ اللهِ الرَّحْمَنِ الرَّحِيمِ (1) الْحَمْدُ لِلَّهِ رَبِّ الْعَلَمِينَ (٢) الرَّحْمَنِ الرَّحِيمِ (۳) مَلِكِ يَوْمِ الدِّينِ (4) إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ (٥) اِهْدِنَا الصِّرَاطَ الْمُسْتَقِيمَ (6) صِرَاطَ الَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ الْمَغْضُوبِ عَلَيْهِمْ وَلَا الضَّالِّينَ (۷)",
             "আয়াতুল কুরসি (৩ বার)" to "اللهُ لَا إِلَهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ ، لَا تَأْخُذُهُ سِنَةٌ وَلَا نَوْمٌ لَهُ مَا فِي السَّمَاتِ وَمَا فِي الْأَرْضِ مَنْ ذَا الَّذِي يَشْفَعُ عِنْدَةً إِلَّا بِإِذْنِهِ يَعْلَمُ مَا بَيْنَ أَيْدِيهِمْ وَمَا خَلْفَهُمْ وَلَا يُحِيطُونَ بِشَيْءٍ مِّنْ عِلْمِهِ إِلَّا بِمَا شَاءَ وَسِعَ كُرْسِيُّهُ السَّمَوَاتِ وَالْأَرْضَ وَلَا يَئُودُهُ حِفْظُهُمَا وَهُوَ الْعَلِيُّ الْعَظِيمُ",
             "৪ কুল ও বিশেষ দু'আসমূহ" to "সূরা আল-কাফিরূন, সূরা আল-ইখলাস, সূরা আল-ফালাক, সূরা আন-নাস (প্রত্যেকটি ৩ বার করে)",
-            "সকাল ও সন্ধ্যার তাসবিহ" to "سُبْحَانَ اللَّهِ ، وَالْحَمْدُ لِلَّهِ ، وَلَا إِلَهَ إِلَّا اللَّهُ ، وَاللَّهُ أَكْبَرُ (১০ বার)\n\nلَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ ، وَلَهُ الْحَمْدُ (১০০ বার)",
-            "সায়্যিদুল ইস্তিগফার (১ বার)" to "اللَّهُمَّ أَنْتَ رَبِّي لَا إِلَهَ إِلَّا أَنْتَ، خَلَقْتَنِي وَأَنَا عَبْدُكَ ، وَأَنَا عَلَى عهدك ووعدك ما استطعت ، أعوذ بك من شر ما صنعت ، أبوء لك بنعمتك علي ، وأبوء لك بذنبي فاغفر لي ، فإنه لا يغفر الذনوب إلا أنت",
-            "ঘুমানোর পূর্বের আমল" to "১. ওযু করে ঘুমানো।\n২. বিছানা ঝেড়ে শোয়া।\n৩. আয়াতুল কুরসি পড়া।\n৪. ৩ কুল পড়ে শরীরে ফু দেওয়া।\n৫. ঘুমের দোয়া: (اللَّهُمَّ بِاسْمِكَ أَمُوتُ وَأَحْيَا)\n৬. ঘুম থেকে উঠে দোয়া পড়া।"
+            "সকাল ও সন্ধ্যার তাসবিহ" to "সুবহানাল্লাহ (১০ বার), আলহামদুলিল্লাহ (১০ বার), আল্লাহু আকবার (১০ বার)\n\nলা ইলাহা ইল্লাল্লাহু ওয়াহদাহু লা শারীকা লাহু... (১০০ বার)",
+            "সায়্যিদুল ইস্তিগফার (১ বার)" to "আল্লাহুম্মা আনতা রব্বী লা ইলাহা ইল্লা আনতা, খালাকতানী ওয়া আনা আবদুকা, ওয়া আনা আলা আহদিকা ওয়া ওয়া'দিকা মাস্তাত্বা'তু...",
+            "ঘুমানোর পূর্বের আমল" to "১. ওযু করে ঘুমানো।\n২. বিছানা ঝেড়ে শোয়া।\n৩. আয়াতুল কুরসি পড়া।\n৪. ৩ কুল পড়ে শরীরে ফু দেওয়া।\n৫. ঘুমের দোয়া: (আল্লাহুম্মা বিসমিকা আমূতু ওয়া আহ্ইয়া)\n৬. ঘুম থেকে উঠে দোয়া পড়া।"
         )
 
         for (item in items) {
@@ -1216,7 +1376,7 @@ class MainActivity : Activity() {
 
         val manzilAyats = listOf(
             "১. সূরা আল-ইনশিকাক (১-২৫)" to "بِسْمِ اللهِ الرَّحْمَنِ الرَّحِيمِ\nإِذَا السَّمَاءُ انْشَقَّتْ ، وَأَذِنَتْ لِرَبِّهَا وَحُقَّتْ ، وَإِذَا الْأَرْضُ مُدَّتْ وَأَلْقَتْ مَا فِيهَا وَتَخَلَّتْ ، وَأَذِنَتْ لِرَبِّهَا وَحُقَّتْ ، يَأَيُّهَا الْإِنْسَانُ إِنَّكَ كَادِحٌ إِلَى رَبِّكَ كَدْحًا فَمُلَقِيهِ...",
-            "২. সূরা আল-ফাতিহা ও আল-বাকারাহ (১-৫)" to "بِسْمِ اللهِ الرَّحْمَنِ الرَّحِيمِ\nالْحَمْدُ لِلَّهِ رَبِّ الْعَلَمِينَ ، الرَّحْمَنِ الرَّحِيمِ ، مَلِكِ יَوْمِ الدِّينِ...\n\nالم ، ذَلِكَ الْكِتَبُ لَا رَيْبَ فِيهِ هُدًى لِلْمُتَّقِينَ...",
+            "২. সূরা আল-ফাতিহা ও আল-বাকারাহ (১-৫)" to "بِسْمِ اللهِ الرَّحْمَنِ الرَّحِيمِ\nالْحَمْدُ لِلَّهِ رَبِّ الْعَلَمِينَ ، الرَّحْمَنِ الرَّحِيمِ ، مَلِكِ יَوْمِ الدِّينِ...\n\nالم ، ذَلِكَ الْكِتَبُ لَا رَيْبَ فِيهِ هُদًى لِلْمُتَّقِينَ...",
             "৩. আয়াতুল কুরসি ও আমানার রাসুল" to "اللهُ لَا إِلَهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ...\n\nآمَنَ الرَّسُولُ بِمَا أُنْزِلَ إِلَيْهِ مِنْ رَّبِّهِ وَالْمُؤْمِنُونَ...",
             "৪. সূরা আলে ইমরান, আল-আ'রাফ ও আল-ইসরা" to "شَهِدَ اللَّهُ أَنَّهُ لَا إِلَهَ إِلَّا هُوَ وَالْمَلَئِكَةُ...\n\nإِنَّ رَبَّكُمُ اللَّهُ الَّذِي خَلَقَ السَّمَوَاتِ وَالْأَرْضَ...",
             "৫. সূরা আস-সাফফাত, আল-হাশর ও আল-জিন" to "وَالصَّافَّاتِ صَفًّا ، فَالزَّاجِرَاتِ زَجْرًا...\n\nلَوْ أَنْزَلْنَا هَذَا الْقُرْآنَ عَلَى جَبَلٍ لَرَأَيْتَهُ خَاشِعًا...\n\nقُلْ أُوحِيَ إِلَيَّ أَنَّهُ اسْتَمَعَ نَفَرٌ مِنَ الْجِنِّ..."
