@@ -21,7 +21,7 @@ jobs:
 
     - name: Setup Android Project Files
       run: |
-        # settings.gradle.kts তৈরি
+        # root settings.gradle.kts
         cat << 'EOF' > settings.gradle.kts
         pluginManagement {
             repositories {
@@ -41,7 +41,7 @@ jobs:
         include(":app")
         EOF
 
-        # root build.gradle.kts তৈরি
+        # root build.gradle.kts
         cat << 'EOF' > build.gradle.kts
         plugins {
             id("com.android.application") version "8.2.2" apply false
@@ -49,7 +49,7 @@ jobs:
         }
         EOF
 
-        # app/build.gradle.kts তৈরি
+        # app/build.gradle.kts
         mkdir -p app
         cat << 'EOF' > app/build.gradle.kts
         plugins {
@@ -91,7 +91,7 @@ jobs:
         }
         EOF
 
-        # AndroidManifest.xml তৈরি
+        # AndroidManifest.xml
         mkdir -p app/src/main
         cat << 'EOF' > app/src/main/AndroidManifest.xml
         <?xml version="1.0" encoding="utf-8"?>
@@ -114,8 +114,10 @@ jobs:
         </manifest>
         EOF
 
-    - name: Setup Gradle
+    - name: Setup Gradle 8.2
       uses: gradle/actions/setup-gradle@v3
+      with:
+        gradle-version: '8.2'
 
     - name: Build Debug APK
       run: gradle assembleDebug
