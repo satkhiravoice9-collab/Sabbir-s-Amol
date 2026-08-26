@@ -1,14 +1,15 @@
 package com.sabbirsamol.app
 
 import android.accounts.AccountManager
-import android.app.Activity
-import android.app.AlertDialog
+import android.app.*
 import android.content.ActivityNotFoundException
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -18,6 +19,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.view.Gravity
 import android.widget.*
+import androidx.core.app.NotificationCompat
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -26,11 +28,45 @@ import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
 import java.text.SimpleDateFormat
+import java.time.chrono.HijrahDate
+import java.time.temporal.ChronoField
 import java.util.*
 import kotlin.concurrent.thread
 
 data class ZikrItem(val id: String, var name: String, var count: Int, var target: Int)
 data class NoteItem(val id: String, var title: String, var content: String, val date: String)
+
+class PrayerAlarmReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val title = intent.getStringExtra("title") ?: "নামাজের ওয়াক্ত হয়েছে"
+        val message = intent.getStringExtra("message") ?: "নামাজের জন্য প্রস্তুতি নিন।"
+
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val channelId = "prayer_alarm_channel"
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(channelId, "নামাজের অ্যালার্ম", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "নামাজের ওয়াক্তের অ্যালার্ম নোটিফিকেশন"
+                enableVibration(true)
+            }
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        val alarmSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+
+        val notification = NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setContentTitle(title)
+            .setContentText(message)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setSound(alarmSound)
+            .setAutoCancel(true)
+            .build()
+
+        notificationManager.notify(System.currentTimeMillis().toInt(), notification)
+    }
+}
 
 class MainActivity : Activity() {
 
@@ -55,6 +91,7 @@ class MainActivity : Activity() {
 
     private val timerHandler = Handler(Looper.getMainLooper())
     private var timerRunnable: Runnable? = null
+    private var liveClockTextView: TextView? = null
     private var liveTimerTextView: TextView? = null
     private var liveWaqtTextView: TextView? = null
 
@@ -76,6 +113,30 @@ class MainActivity : Activity() {
         if (h > 12) h -= 12
         if (h == 0) h = 12
         return "${toBangla(String.format("%02d", h))}:${toBangla(String.format("%02d", minute % 60))}"
+    }
+
+    private fun getCombinedIslamicDate(): Triple<String, String, String> {
+        val now = Calendar.getInstance()
+        val engFormat = SimpleDateFormat("EEEE, dd MMMM yyyy", Locale.ENGLISH)
+        val engDate = engFormat.format(now.time)
+
+        val arabicMonths = arrayOf("মুহররম", "সফর", "রবিউল আউয়াল", "রবিউস সানি", "জমাদিউল আউয়াল", "জমাদিউস সানি", "রজব", "শাবান", "রমজান", "শাওয়াল", "জ্বিলকদ", "জ্বিলহজ্জ")
+        val hDate = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val hijrah = HijrahDate.now()
+            val day = hijrah.get(ChronoField.DAY_OF_MONTH)
+            val month = hijrah.get(ChronoField.MONTH_OF_YEAR)
+            val year = hijrah.get(ChronoField.YEAR_OF_ERA)
+            "${toBangla(day)} ${arabicMonths[(month - 1).coerceIn(0, 11)]}, ${toBangla(year)} হিজরি"
+        } else {
+            "১২ রবিউল আউয়াল, ১৪৪৮ হিজরি"
+        }
+
+        val bnMonthNames = arrayOf("বৈশাখ", "জ্যৈষ্ঠ", "আষাঢ়", "শ্রাবণ", "ভাদ্র", "আশ্বিন", "কার্তিক", "অগ্রহায়ণ", "পৌষ", "মাঘ", "ফাল্গুন", "চৈত্র")
+        val dayOfYear = now.get(Calendar.DAY_OF_YEAR)
+        val bnYear = if (dayOfYear >= 105) now.get(Calendar.YEAR) - 593 else now.get(Calendar.YEAR) - 594
+        val bnDate = "${toBangla(now.get(Calendar.DAY_OF_MONTH))} ${bnMonthNames[(now.get(Calendar.MONTH) + 8) % 12]}, ${toBangla(bnYear)} বঙ্গাব্দ"
+
+        return Triple(hDate, bnDate, engDate)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -244,6 +305,31 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun setPrayerAlarm(reqCode: Int, hour: Int, minute: Int, title: String, message: String, isEnable: Boolean) {
+        val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val intent = Intent(this, PrayerAlarmReceiver::class.java).apply {
+            putExtra("title", title)
+            putExtra("message", message)
+        }
+        val pendingIntent = PendingIntent.getBroadcast(this, reqCode, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+
+        if (isEnable) {
+            val cal = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, hour)
+                set(Calendar.MINUTE, minute)
+                set(Calendar.SECOND, 0)
+                if (before(Calendar.getInstance())) add(Calendar.DATE, 1)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, cal.timeInMillis, pendingIntent)
+            } else {
+                alarmManager.setExact(AlarmManager.RTC_WAKEUP, cal.timeInMillis, pendingIntent)
+            }
+        } else {
+            alarmManager.cancel(pendingIntent)
+        }
+    }
+
     private fun promptGoogleAccountPicker() {
         try {
             val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -264,9 +350,7 @@ class MainActivity : Activity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == GOOGLE_ACCOUNT_PICKER_REQUEST && resultCode == RESULT_OK && data != null) {
             val accountName = data.getStringExtra(AccountManager.KEY_ACCOUNT_NAME)
-            if (!accountName.isNullOrEmpty()) {
-                handleSuccessfulLogin(accountName)
-            }
+            if (!accountName.isNullOrEmpty()) handleSuccessfulLogin(accountName)
         }
     }
 
@@ -421,8 +505,17 @@ class MainActivity : Activity() {
 
     private fun updateCountdown() {
         val now = Calendar.getInstance()
-        val currentMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
-        val currentSeconds = now.get(Calendar.SECOND)
+        val hour24 = now.get(Calendar.HOUR_OF_DAY)
+        val min = now.get(Calendar.MINUTE)
+        val sec = now.get(Calendar.SECOND)
+        val currentMinutes = hour24 * 60 + min
+
+        // বর্তমান লাইভ ঘড়ি
+        var h12 = hour24 % 12
+        if (h12 == 0) h12 = 12
+        val amPm = if (hour24 < 12) "পূর্বাহ্ন (AM)" else "অপরাহ্ন (PM)"
+        val liveClockStr = String.format("%02d:%02d:%02d %s", h12, min, sec, amPm)
+        liveClockTextView?.text = "🕒 বর্তমান সময়: " + toBangla(liveClockStr)
 
         val offset = if (selectedDistrict.contains("সাতক্ষীরা")) 4 else if (selectedDistrict.contains("ঢাকা")) 0 else 2
         val asrExtra = if (selectedMadhab == "হানাফী") 45 else 0
@@ -452,7 +545,7 @@ class MainActivity : Activity() {
             else -> "তাহাজ্জুদ ও সাহরির সময়" to (24 * 60 + sehriEnd)
         }
 
-        var diffSec = (targetMin * 60) - (currentMinutes * 60 + currentSeconds)
+        var diffSec = (targetMin * 60) - (currentMinutes * 60 + sec)
         if (diffSec < 0) diffSec += 24 * 3600
 
         val h = diffSec / 3600
@@ -464,27 +557,90 @@ class MainActivity : Activity() {
         liveTimerTextView?.text = toBangla(timeString)
     }
 
+    // ১. হোম স্ক্রিন (লাইভ ঘড়ি, ৩ ক্যালেন্ডার তারিখ ও নামাজের অ্যালার্মসহ)
     private fun showHomeScreen() {
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = getThemeBackground() }
         val scroll = ScrollView(this).apply { layoutParams = LinearLayout.LayoutParams(-1, 0, 1f) }
         val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(24, 24, 24, 24) }
         val accent = getAccentColor()
 
-        // লাইভ কাউন্টডাউন কার্ড
+        // ১. লাইভ ডিজিটাল ঘড়ি কার্ড (চলমান সময়)
+        val clockCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(18, 12, 18, 12)
+            val bg = GradientDrawable()
+            bg.setColor(if (isWhiteTheme()) Color.parseColor("#EFF6FF") else Color.parseColor("#172554"))
+            bg.cornerRadius = 20f
+            bg.setStroke(2, Color.parseColor("#3B82F6"))
+            background = bg
+        }
+
+        liveClockTextView = TextView(this).apply {
+            text = "🕒 বর্তমান সময়: লোড হচ্ছে..."
+            textSize = 16.5f
+            typeface = Typeface.SERIF
+            setTextColor(if (isWhiteTheme()) Color.parseColor("#1D4ED8") else Color.parseColor("#93C5FD"))
+            setTypeface(Typeface.SERIF, Typeface.BOLD)
+            gravity = Gravity.CENTER
+        }
+        clockCard.addView(liveClockTextView)
+        content.addView(clockCard)
+
+        // ২. ৩ ক্যালেন্ডার লাইভ তারিখ হেডার কার্ড
+        val dateCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(20, 14, 20, 14)
+            val bg = GradientDrawable()
+            bg.setColor(if (isWhiteTheme()) Color.parseColor("#FEF3C7") else Color.parseColor("#1B2E24"))
+            bg.cornerRadius = 20f
+            bg.setStroke(1, accent)
+            background = bg
+            val lp = LinearLayout.LayoutParams(-1, -2)
+            lp.setMargins(0, 12, 0, 0)
+            layoutParams = lp
+        }
+
+        val (hijri, bangla, english) = getCombinedIslamicDate()
+
+        val hDateView = TextView(this).apply {
+            text = "🌙 $hijri"
+            textSize = 15f
+            typeface = Typeface.SERIF
+            setTextColor(getTextColor())
+            setTypeface(Typeface.SERIF, Typeface.BOLD)
+            gravity = Gravity.CENTER
+        }
+        val bnEngDateView = TextView(this).apply {
+            text = "📅 $bangla  |  $english"
+            textSize = 12f
+            typeface = Typeface.SERIF
+            setTextColor(getSecondaryTextColor())
+            gravity = Gravity.CENTER
+            setPadding(0, 4, 0, 0)
+        }
+        dateCard.addView(hDateView)
+        dateCard.addView(bnEngDateView)
+        content.addView(dateCard)
+
+        // ৩. লাইভ ওয়াক্ত কাউন্টডাউন টাইমার কার্ড
         val timerCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(26, 22, 26, 22)
+            setPadding(26, 20, 26, 20)
             val bg = GradientDrawable()
             bg.setColor(if (isWhiteTheme()) Color.parseColor("#FFFBEB") else Color.parseColor("#1B2E24"))
             bg.cornerRadius = 30f
             bg.setStroke(3, accent)
             background = bg
+            val lp = LinearLayout.LayoutParams(-1, -2)
+            lp.setMargins(0, 12, 0, 0)
+            layoutParams = lp
         }
 
         liveWaqtTextView = TextView(this).apply {
             text = "ওয়াক্ত শেষ হতে বাকি"
-            textSize = 15.5f
+            textSize = 15f
             typeface = Typeface.SERIF
             setTextColor(getTextColor())
             setTypeface(Typeface.SERIF, Typeface.BOLD)
@@ -493,7 +649,7 @@ class MainActivity : Activity() {
 
         liveTimerTextView = TextView(this).apply {
             text = "০০:০০:০০"
-            textSize = 42f
+            textSize = 40f
             typeface = Typeface.SERIF
             setTextColor(accent)
             setTypeface(Typeface.SERIF, Typeface.BOLD)
@@ -527,7 +683,7 @@ class MainActivity : Activity() {
 
         val offset = if (selectedDistrict.contains("সাতক্ষীরা")) 4 else if (selectedDistrict.contains("ঢাকা")) 0 else 2
 
-        // ১. সাহরি, ইফতার ও তাহাজ্জুদ কার্ড
+        // সাহরি ও ইফতার কার্ড
         val specialCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(20, 16, 20, 16)
@@ -537,7 +693,7 @@ class MainActivity : Activity() {
             bg.setStroke(2, accent)
             background = bg
             val lp = LinearLayout.LayoutParams(-1, -2)
-            lp.setMargins(0, 16, 0, 0)
+            lp.setMargins(0, 14, 0, 0)
             layoutParams = lp
         }
 
@@ -566,7 +722,7 @@ class MainActivity : Activity() {
         }
         content.addView(specialCard)
 
-        // ২. নামাজের ৫ ওয়াক্তের সময়সূচী
+        // ৫ ওয়াক্ত নামাজের সময়সূচী + অ্যালার্ম
         val prayerCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(20, 16, 20, 16)
@@ -581,7 +737,7 @@ class MainActivity : Activity() {
         }
 
         val pTitle = TextView(this).apply {
-            text = "🕌 ৫ ওয়াক্ত নামাজের সময় ($selectedMadhab মাযহাব)"
+            text = "🕌 ৫ ওয়াক্ত নামাজ ও অ্যালার্ম ($selectedMadhab)"
             textSize = 15.5f
             typeface = Typeface.SERIF
             setTextColor(accent)
@@ -593,25 +749,41 @@ class MainActivity : Activity() {
         val asrStartHour = if (selectedMadhab == "হানাফী") 4 else 3
         val asrStartMin = if (selectedMadhab == "হানাফী") 37 else 52
 
-        val times = listOf(
-            "ফজর" to "${formatBanglaTime(4, 25)} - ${formatBanglaTime(5, 43)} মি.",
-            "যোহর" to "${formatBanglaTime(12, 8)} - ${formatBanglaTime(asrStartHour, asrStartMin - 1)} মি.",
-            "আসর ($selectedMadhab)" to "${formatBanglaTime(asrStartHour, asrStartMin)} - ${formatBanglaTime(6, 10)} মি.",
-            "মাগরিব" to "${formatBanglaTime(6, 27)} - ${formatBanglaTime(7, 43)} মি.",
-            "এশা ও বিতর" to "${formatBanglaTime(7, 44)} - ${formatBanglaTime(4, 24)} মি."
+        val prayerAlarmList = listOf(
+            Triple("ফজর", "${formatBanglaTime(4, 25 + offset)} মি.", Pair(4, 25 + offset)),
+            Triple("যোহর", "${formatBanglaTime(12, 8 + offset)} মি.", Pair(12, 8 + offset)),
+            Triple("আসর", "${formatBanglaTime(asrStartHour, asrStartMin + offset)} মি.", Pair(if (asrStartHour < 12) asrStartHour + 12 else asrStartHour, asrStartMin + offset)),
+            Triple("মাগরিব", "${formatBanglaTime(6, 27 + offset)} মি.", Pair(18, 27 + offset)),
+            Triple("এশা", "${formatBanglaTime(7, 44 + offset)} মি.", Pair(19, 44 + offset))
         )
 
-        for (t in times) {
-            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, 5, 0, 5) }
-            val name = TextView(this).apply { text = t.first; setTextColor(getTextColor()); textSize = 14f; typeface = Typeface.SERIF; layoutParams = LinearLayout.LayoutParams(0, -2, 1f) }
-            val time = TextView(this).apply { text = t.second; setTextColor(if (isWhiteTheme()) Color.parseColor("#059669") else Color.parseColor("#86EFAC")); textSize = 14f; typeface = Typeface.SERIF; setTypeface(Typeface.SERIF, Typeface.BOLD) }
+        for ((idx, p) in prayerAlarmList.withIndex()) {
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, 4, 0, 4)
+            }
+            val name = TextView(this).apply { text = p.first; setTextColor(getTextColor()); textSize = 14f; typeface = Typeface.SERIF; layoutParams = LinearLayout.LayoutParams(0, -2, 1f) }
+            val time = TextView(this).apply { text = p.second; setTextColor(if (isWhiteTheme()) Color.parseColor("#059669") else Color.parseColor("#86EFAC")); textSize = 14f; typeface = Typeface.SERIF; setTypeface(Typeface.SERIF, Typeface.BOLD); setPadding(0, 0, 16, 0) }
+
+            val alarmSwitch = Switch(this).apply {
+                val alarmKey = "alarm_${p.first}"
+                isChecked = prefs.getBoolean(alarmKey, false)
+                setOnCheckedChangeListener { _, isChecked ->
+                    prefs.edit().putBoolean(alarmKey, isChecked).apply()
+                    setPrayerAlarm(100 + idx, p.third.first, p.third.second, "${p.first} নামাজের ওয়াক্ত হয়েছে", "নামাজের জন্য প্রস্তুতি নিয়ে মসজিদে চলুন।", isChecked)
+                    Toast.makeText(this@MainActivity, "${p.first} অ্যালার্ম " + (if (isChecked) "চালু হয়েছে" else "বন্ধ হয়েছে"), Toast.LENGTH_SHORT).show()
+                }
+            }
+
             row.addView(name)
             row.addView(time)
+            row.addView(alarmSwitch)
             prayerCard.addView(row)
         }
         content.addView(prayerCard)
 
-        // ৩. নামাজ নিষিদ্ধ (হারাম) ৩টি সময়সূচী কার্ড
+        // নামাজ নিষিদ্ধ ৩টি হারাম ওয়াক্ত
         val haramCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(20, 16, 20, 16)
@@ -651,7 +823,6 @@ class MainActivity : Activity() {
         }
         content.addView(haramCard)
 
-        // ডিজিটাল তাসবিহ ও ফোল্ডার বাটন
         val btnTasbih = Button(this).apply {
             text = "📿 ডিজিটাল তাসবিহ চালু করুন"
             setBackgroundColor(accent)
