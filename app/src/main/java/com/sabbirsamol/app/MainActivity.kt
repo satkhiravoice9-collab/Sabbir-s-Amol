@@ -4,8 +4,8 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
-import android.graphics.*
-import android.graphics.drawable.BitmapDrawable
+import android.graphics.Color
+import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
@@ -13,7 +13,6 @@ import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.view.Gravity
-import android.view.View
 import android.widget.*
 import org.json.JSONArray
 import org.json.JSONObject
@@ -36,7 +35,7 @@ class MainActivity : Activity() {
     private val zikrList = mutableListOf<ZikrItem>()
     private var activeZikrId: String = ""
     
-    // ৪ টি স্বতন্ত্র থিম মোড
+    // ৪ টি প্রিমিয়াম থিম
     private var currentTheme = "কাবা থিম (ডার্ক গোল্ড)"
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -149,57 +148,7 @@ class MainActivity : Activity() {
         }
     }
 
-    // কাবা শরীফের কাস্টম আর্ট আইকন তৈরি
-    private fun createKabaBitmap(): Bitmap {
-        val size = 200
-        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-
-        // কাবা বেস বডি (কালো কিউব)
-        paint.color = Color.parseColor("#151515")
-        canvas.drawRoundRect(RectF(40f, 40f, 160f, 160f), 12f, 12f, paint)
-
-        // কাবার গিলাফের সোনালী বেল্ট (কিসওয়াহ স্ট্রিপ)
-        paint.color = Color.parseColor("#F5C358")
-        canvas.drawRect(40f, 65f, 160f, 82f, paint)
-
-        // কাবার দরজা (সোনালী গেট)
-        paint.color = Color.parseColor("#D4AF37")
-        canvas.drawRoundRect(RectF(110f, 100f, 140f, 160f), 6f, 6f, paint)
-
-        return bitmap
-    }
-
-    // মদিনা শরীফের সবুজ গম্বুজ আইকন তৈরি
-    private fun createMadinaDomeBitmap(): Bitmap {
-        val size = 200
-        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-
-        // গম্বুজ বেস পিলার
-        paint.color = Color.parseColor("#FFFFFF")
-        canvas.drawRect(50f, 110f, 150f, 160f, paint)
-
-        // সবুজ গম্বুজ (Green Dome)
-        paint.color = Color.parseColor("#0E7A4A")
-        val path = Path()
-        path.moveTo(50f, 110f)
-        path.quadTo(100f, 20f, 150f, 110f)
-        path.close()
-        canvas.drawPath(path, paint)
-
-        // গম্বুজের সোনালী মিনার ক্রেসেন্ট শীর্ষ
-        paint.color = Color.parseColor("#F5C358")
-        paint.strokeWidth = 6f
-        canvas.drawLine(100f, 20f, 100f, 5f, paint)
-        canvas.drawCircle(100f, 5f, 6f, paint)
-
-        return bitmap
-    }
-
-    // ৪ কালার থিম গ্রেডিয়েন্ট ব্যাকগ্রাউন্ড
+    // ৪ কালারের ব্যাকগ্রাউন্ড
     private fun getThemeBackground(): GradientDrawable {
         return when (currentTheme) {
             "মদিনা থিম (এমারেল্ড গ্রিন)" -> GradientDrawable(
@@ -278,7 +227,7 @@ class MainActivity : Activity() {
         return nav
     }
 
-    // ১. হোম স্ক্রিন (কাবা ও সবুজ গম্বুজ আইকনসহ)
+    // ১. হোম স্ক্রিন (কাবা ও সবুজ গম্বুজ ব্যাজসহ)
     private fun showHomeScreen() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -296,22 +245,23 @@ class MainActivity : Activity() {
 
         val accent = getAccentColor()
 
-        // আইকন হেডার রো (কাবা ও মদিনা গম্বুজ আইকন আর্ট)
+        // টপ আইকন হেডার
         val iconHeader = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, 0, 0, 16)
         }
 
-        val kabaView = ImageView(this).apply {
-            setImageBitmap(createKabaBitmap())
-            layoutParams = LinearLayout.LayoutParams(110, 110)
+        val kabaBadge = TextView(this).apply {
+            text = "🕋"
+            textSize = 36f
+            gravity = Gravity.CENTER
         }
 
         val titleBox = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             val lp = LinearLayout.LayoutParams(0, -2, 1f)
-            lp.setMargins(16, 0, 16, 0)
+            lp.setMargins(14, 0, 14, 0)
             layoutParams = lp
         }
 
@@ -332,14 +282,15 @@ class MainActivity : Activity() {
         titleBox.addView(title)
         titleBox.addView(dateText)
 
-        val domeView = ImageView(this).apply {
-            setImageBitmap(createMadinaDomeBitmap())
-            layoutParams = LinearLayout.LayoutParams(110, 110)
+        val domeBadge = TextView(this).apply {
+            text = "🕌"
+            textSize = 36f
+            gravity = Gravity.CENTER
         }
 
-        iconHeader.addView(kabaView)
+        iconHeader.addView(kabaBadge)
         iconHeader.addView(titleBox)
-        iconHeader.addView(domeView)
+        iconHeader.addView(domeBadge)
         content.addView(iconHeader)
 
         // নামাজের সময় কার্ড
@@ -425,7 +376,7 @@ class MainActivity : Activity() {
         setContentView(root)
     }
 
-    // ২. সম্পূর্ণ ফুল-স্ক্রিন ট্যাপ তাসবিহ (আইকন ব্যাকগ্রাউন্ডসহ)
+    // ২. সম্পূর্ণ ফুল-স্ক্রিন ট্যাপ তাসবিহ
     private fun showTasbihScreen() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -470,7 +421,7 @@ class MainActivity : Activity() {
         topBar.addView(btnReset)
         root.addView(topBar)
 
-        // ফুল স্ক্রিন ট্যাপ এরিয়া
+        // ফুল স্ক্রিন ট্যাপ এরিয়া (সম্পূর্ণ স্ক্রিন তাসবিহ)
         val fullScreenTap = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(-1, 0, 1f)
@@ -478,13 +429,14 @@ class MainActivity : Activity() {
             setPadding(32, 10, 32, 10)
         }
 
-        // সেন্টার ইসলামিক থিম আইকন
-        val centerIcon = ImageView(this).apply {
-            val bmp = if (currentTheme.contains("মদিনা")) createMadinaDomeBitmap() else createKabaBitmap()
-            setImageBitmap(bmp)
-            val lp = LinearLayout.LayoutParams(160, 160)
-            lp.setMargins(0, 0, 0, 16)
-            layoutParams = lp
+        // সেন্টার ইসলামিক আইকন ব্যাজ
+        val centerIcon = TextView(this).apply {
+            text = if (currentTheme.contains("মদিনা")) "🕌\n(মদিনা শরীফ)" else "🕋\n(কাবা শরীফ)"
+            textSize = 28f
+            gravity = Gravity.CENTER
+            setTextColor(accent)
+            setTypeface(null, Typeface.BOLD)
+            setPadding(0, 0, 0, 10)
         }
         fullScreenTap.addView(centerIcon)
 
@@ -576,4 +528,53 @@ class MainActivity : Activity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = getThemeBackground()
-     
+        }
+
+        val scroll = ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(-1, 0, 1f)
+        }
+
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(28, 28, 28, 28)
+        }
+
+        val accent = getAccentColor()
+
+        val headerRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 0, 0, 20)
+        }
+
+        val title = TextView(this).apply {
+            text = "জিকির তালিকা ও কাস্টমাইজেশন"
+            textSize = 20f
+            setTextColor(accent)
+            setTypeface(null, Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+        }
+        headerRow.addView(title)
+        content.addView(headerRow)
+
+        val btnAddZikr = Button(this).apply {
+            text = "➕ নতুন জিকির যোগ করুন (Add Zikr)"
+            setBackgroundColor(accent)
+            setTextColor(Color.BLACK)
+            textSize = 15f
+            setTypeface(null, Typeface.BOLD)
+            val lp = LinearLayout.LayoutParams(-1, -2)
+            lp.setMargins(0, 0, 0, 24)
+            layoutParams = lp
+            setOnClickListener { showAddZikrDialog() }
+        }
+        content.addView(btnAddZikr)
+
+        for (item in zikrList) {
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(24, 20, 24, 20)
+                val bg = GradientDrawable()
+                bg.setColor(if (item.id == activeZikrId) Color.parseColor("#264536") else Color.parseColor("#1B2E24"))
+                bg.cornerRadius = 20f
+                bg.setStroke(if (item.id == activeZikrId) 3 else 1, if (item.id == activeZikrId) accent else Color.parse
