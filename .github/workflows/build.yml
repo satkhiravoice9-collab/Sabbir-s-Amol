@@ -19,10 +19,13 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
-    - name: Generate Complete Android Project Files
+    - name: Set up Android SDK
+      uses: android-actions/setup-android@v3
+
+    - name: Prepare Clean Android Project
       run: |
-        # ১. settings.gradle.kts
-        cat << 'EOF' > settings.gradle.kts
+        # 1. settings.gradle
+        cat << 'EOF' > settings.gradle
         pluginManagement {
             repositories {
                 google()
@@ -38,68 +41,76 @@ jobs:
             }
         }
         rootProject.name = "Sabbir-s-Amol"
-        include(":app")
+        include ':app'
         EOF
 
-        # ২. root build.gradle.kts
-        cat << 'EOF' > build.gradle.kts
-        plugins {
-            id("com.android.application") version "8.2.2" apply false
-            id("org.jetbrains.kotlin.android") version "1.9.22" apply false
+        # 2. root build.gradle (Groovy - Best Compatibility)
+        cat << 'EOF' > build.gradle
+        buildscript {
+            repositories {
+                google()
+                mavenCentral()
+            }
+            dependencies {
+                classpath 'com.android.tools.build:gradle:8.2.2'
+                classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.22'
+            }
+        }
+        allprojects {
+            repositories {
+                google()
+                mavenCentral()
+            }
         }
         EOF
 
-        # ৩. app/build.gradle.kts
+        # 3. app/build.gradle
         mkdir -p app
-        cat << 'EOF' > app/build.gradle.kts
-        plugins {
-            id("com.android.application")
-            id("org.jetbrains.kotlin.android")
-        }
+        cat << 'EOF' > app/build.gradle
+        apply plugin: 'com.android.application'
+        apply plugin: 'kotlin-android'
 
         android {
-            namespace = "com.sabbir.amol"
-            compileSdk = 34
+            namespace 'com.sabbir.amol'
+            compileSdk 34
 
             defaultConfig {
-                applicationId = "com.sabbir.amol"
-                minSdk = 24
-                targetSdk = 34
-                versionCode = 1
-                versionName = "1.0"
+                applicationId "com.sabbir.amol"
+                minSdk 24
+                targetSdk 34
+                versionCode 1
+                versionName "1.0"
             }
 
             buildTypes {
                 release {
-                    isMinifyEnabled = false
+                    minifyEnabled false
                 }
             }
+
             compileOptions {
-                sourceCompatibility = JavaVersion.VERSION_17
-                targetCompatibility = JavaVersion.VERSION_17
+                sourceCompatibility JavaVersion.VERSION_17
+                targetCompatibility JavaVersion.VERSION_17
             }
+
             kotlinOptions {
-                jvmTarget = "17"
+                jvmTarget = '17'
             }
         }
 
         dependencies {
-            implementation("androidx.core:core-ktx:1.12.0")
-            implementation("androidx.appcompat:appcompat:1.6.1")
-            implementation("com.google.android.material:material:1.11.0")
-            implementation("androidx.activity:activity-ktx:1.8.2")
+            implementation 'androidx.core:core-ktx:1.12.0'
+            implementation 'androidx.appcompat:appcompat:1.6.1'
+            implementation 'com.google.android.material:material:1.11.0'
+            implementation 'androidx.activity:activity-ktx:1.8.2'
         }
         EOF
 
-        # ৪. প্রয়োজনীয় রিসোর্স ও থিম ফাইল তৈরি (AAPT2 এরর প্রতিরোধের জন্য)
+        # 4. Values & Strings
         mkdir -p app/src/main/res/values
         cat << 'EOF' > app/src/main/res/values/themes.xml
         <resources>
-            <style name="Theme.SabbirsAmol" parent="Theme.AppCompat.Light.NoActionBar">
-                <item name="colorPrimary">#d97706</item>
-                <item name="colorPrimaryDark">#b45309</item>
-                <item name="colorAccent">#d97706</item>
-            </style>
+            <style name="Theme.SabbirsAmol" parent="Theme.AppCompat.Light.NoActionBar" />
         </resources>
         EOF
 
@@ -109,7 +120,7 @@ jobs:
         </resources>
         EOF
 
-        # ৫. AndroidManifest.xml তৈরি
+        # 5. AndroidManifest.xml
         mkdir -p app/src/main
         cat << 'EOF' > app/src/main/AndroidManifest.xml
         <?xml version="1.0" encoding="utf-8"?>
@@ -121,7 +132,7 @@ jobs:
                 android:supportsRtl="true"
                 android:theme="@style/Theme.SabbirsAmol">
                 <activity
-                    android:name=".MainActivity"
+                    android:name="com.sabbir.amol.MainActivity"
                     android:exported="true">
                     <intent-filter>
                         <action android:name="android.intent.action.MAIN" />
@@ -132,14 +143,14 @@ jobs:
         </manifest>
         EOF
 
-        # ৬. Gradle 8.2 Wrapper তৈরি
-        gradle wrapper --gradle-version 8.2 --distribution-type bin
+        # 6. Make Gradle Wrapper
+        gradle wrapper --gradle-version 8.2
         chmod +x gradlew
 
-    - name: Build Debug APK
-      run: ./gradlew assembleDebug --stacktrace --no-daemon
+    - name: Build APK with Gradle
+      run: ./gradlew assembleDebug --no-daemon
 
-    - name: Upload APK
+    - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: Sabbirs-Amol-APK
