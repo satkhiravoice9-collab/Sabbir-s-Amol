@@ -52,7 +52,6 @@ jobs:
         cat << 'EOF' > gradle.properties
         org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
         android.useAndroidX=true
-        kotlin.code.style=official
         EOF
 
         cat << 'EOF' > app/build.gradle
@@ -67,8 +66,8 @@ jobs:
                 applicationId "com.sabbirsamol.app"
                 minSdkVersion 24
                 targetSdkVersion 34
-                versionCode 1
-                versionName "1.0"
+                versionCode 2
+                versionName "2.0"
             }
 
             compileOptions {
@@ -79,12 +78,6 @@ jobs:
             kotlinOptions {
                 jvmTarget = '17'
             }
-
-            buildTypes {
-                release {
-                    minifyEnabled false
-                }
-            }
         }
 
         dependencies {
@@ -94,6 +87,7 @@ jobs:
 
         cat << 'EOF' > app/src/main/AndroidManifest.xml
         <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+            <uses-permission android:name="android.permission.VIBRATE"/>
             <application
                 android:theme="@android:style/Theme.Material.Light.NoActionBar"
                 android:label="Sabbir's Amol"
