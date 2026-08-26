@@ -1,4 +1,4 @@
-name: Build APK
+name: Build Android APK
 
 on:
   push:
@@ -10,149 +10,98 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
+    - name: Checkout Repository
       uses: actions/checkout@v4
 
     - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
-        java-version: '17'
         distribution: 'temurin'
+        java-version: '17'
 
-    - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
-
-    - name: Create Project Files & Configs
+    - name: Setup Android Project Files
       run: |
-        mkdir -p app/src/main/res/values
-        mkdir -p app/src/main/res/drawable
-        mkdir -p app/src/main/res/mipmap-anydpi-v26
-
-        cat << 'EOF' > settings.gradle
-        rootProject.name = "SabbirsAmol"
-        include ':app'
-        EOF
-
-        cat << 'EOF' > build.gradle
-        buildscript {
+        # settings.gradle.kts তৈরি
+        cat << 'EOF' > settings.gradle.kts
+        pluginManagement {
             repositories {
                 google()
                 mavenCentral()
-            }
-            dependencies {
-                classpath 'com.android.tools.build:gradle:8.1.4'
-                classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.0'
+                gradlePluginPortal()
             }
         }
-        allprojects {
+        dependencyResolutionManagement {
+            repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
             repositories {
                 google()
                 mavenCentral()
             }
         }
+        rootProject.name = "Sabbir-s-Amol"
+        include(":app")
         EOF
 
-        cat << 'EOF' > gradle.properties
-        org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
-        android.useAndroidX=true
+        # root build.gradle.kts তৈরি
+        cat << 'EOF' > build.gradle.kts
+        plugins {
+            id("com.android.application") version "8.2.2" apply false
+            id("org.jetbrains.kotlin.android") version "1.9.22" apply false
+        }
         EOF
 
-        cat << 'EOF' > app/build.gradle
-        apply plugin: 'com.android.application'
-        apply plugin: 'kotlin-android'
+        # app/build.gradle.kts তৈরি
+        mkdir -p app
+        cat << 'EOF' > app/build.gradle.kts
+        plugins {
+            id("com.android.application")
+            id("org.jetbrains.kotlin.android")
+        }
 
         android {
-            namespace 'com.sabbirsamol.app'
-            compileSdk 34
+            namespace = "com.sabbir.amol"
+            compileSdk = 34
 
             defaultConfig {
-                applicationId "com.sabbirsamol.app"
-                minSdk 26
-                targetSdk 34
-                versionCode 16
-                versionName "16.0"
-            }
-
-            compileOptions {
-                sourceCompatibility JavaVersion.VERSION_17
-                targetCompatibility JavaVersion.VERSION_17
-            }
-
-            kotlinOptions {
-                jvmTarget = '17'
+                applicationId = "com.sabbir.amol"
+                minSdk = 24
+                targetSdk = 34
+                versionCode = 1
+                versionName = "1.0"
             }
 
             buildTypes {
-                debug {
-                    minifyEnabled false
-                }
                 release {
-                    minifyEnabled false
+                    isMinifyEnabled = false
                 }
+            }
+            compileOptions {
+                sourceCompatibility = JavaVersion.VERSION_17
+                targetCompatibility = JavaVersion.VERSION_17
+            }
+            kotlinOptions {
+                jvmTarget = "17"
             }
         }
 
         dependencies {
-            implementation "org.jetbrains.kotlin:kotlin-stdlib:1.9.0"
+            implementation("androidx.core:core-ktx:1.12.0")
+            implementation("androidx.appcompat:appcompat:1.6.1")
+            implementation("com.google.android.material:material:1.11.0")
+            implementation("androidx.activity:activity-ktx:1.8.2")
         }
         EOF
 
-        cat << 'EOF' > app/src/main/res/drawable/ic_launcher_background.xml
-        <vector xmlns:android="http://schemas.android.com/apk/res/android"
-            android:width="108dp"
-            android:height="108dp"
-            android:viewportWidth="108"
-            android:viewportHeight="108">
-            <path
-                android:fillColor="#0D281E"
-                android:pathData="M0,0h108v108h-108z"/>
-        </vector>
-        EOF
-
-        cat << 'EOF' > app/src/main/res/drawable/ic_launcher_foreground.xml
-        <vector xmlns:android="http://schemas.android.com/apk/res/android"
-            android:width="108dp"
-            android:height="108dp"
-            android:viewportWidth="108"
-            android:viewportHeight="108">
-            <path
-                android:fillColor="#F5C358"
-                android:pathData="M54,26 C41.85,26 32,35.85 32,48 C32,60.15 41.85,70 54,70 C59.2,70 63.95,68.2 67.75,65.15 C62.3,64.2 58.2,59.5 58.2,53.8 C58.2,48.1 62.3,43.4 67.75,42.45 C63.95,39.4 59.2,37.6 54,26 Z"/>
-            <path
-                android:fillColor="#F5C358"
-                android:pathData="M68,36 L70,41 L75,41 L71,44 L72.5,49 L68,46 L63.5,49 L65,44 L61,41 L66,41 Z"/>
-            <path
-                android:fillColor="#111827"
-                android:pathData="M44,60 L64,60 L64,78 L44,78 Z"/>
-            <path
-                android:fillColor="#F5C358"
-                android:pathData="M44,63 L64,63 L64,65 L44,65 Z"/>
-        </vector>
-        EOF
-
-        cat << 'EOF' > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
-        <?xml version="1.0" encoding="utf-8"?>
-        <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-            <background android:drawable="@drawable/ic_launcher_background" />
-            <foreground android:drawable="@drawable/ic_launcher_foreground" />
-        </adaptive-icon>
-        EOF
-
+        # AndroidManifest.xml তৈরি
+        mkdir -p app/src/main
         cat << 'EOF' > app/src/main/AndroidManifest.xml
         <?xml version="1.0" encoding="utf-8"?>
         <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-            <uses-permission android:name="android.permission.VIBRATE" />
             <uses-permission android:name="android.permission.INTERNET" />
-            <uses-permission android:name="android.permission.GET_ACCOUNTS" />
-            <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-            <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
             <application
                 android:allowBackup="true"
-                android:icon="@mipmap/ic_launcher"
-                android:roundIcon="@mipmap/ic_launcher"
                 android:label="Sabbir's Amol"
                 android:supportsRtl="true"
-                android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+                android:theme="@style/Theme.AppCompat.Light.NoActionBar">
                 <activity
                     android:name=".MainActivity"
                     android:exported="true">
@@ -161,28 +110,18 @@ jobs:
                         <category android:name="android.intent.category.LAUNCHER" />
                     </intent-filter>
                 </activity>
-                <receiver android:name=".PrayerAlarmReceiver" android:exported="false" />
             </application>
         </manifest>
         EOF
 
-        cat << 'EOF' > app/src/main/res/values/strings.xml
-        <resources>
-            <string name="app_name">Sabbir\'s Amol</string>
-        </resources>
-        EOF
-
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
-      with:
-        gradle-version: '8.1.1'
-        cache-disabled: true
 
-    - name: Build APK
-      run: gradle assembleDebug --no-daemon
+    - name: Build Debug APK
+      run: gradle assembleDebug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: Sabbirs-Tasbih-APK
+        name: Sabbirs-Amol-APK
         path: app/build/outputs/apk/debug/*.apk
