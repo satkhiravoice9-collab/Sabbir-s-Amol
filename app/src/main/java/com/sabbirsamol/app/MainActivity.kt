@@ -15,7 +15,6 @@ import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.view.Gravity
-import android.view.View
 import android.widget.*
 import org.json.JSONArray
 import org.json.JSONObject
@@ -49,8 +48,8 @@ class MainActivity : Activity() {
     private var currentTheme = "সাদা থিম (লাইট)"
     private var selectedDivision = "খুলনা"
     private var selectedDistrict = "সাতক্ষীরা"
-    private var selectedThana = "সাতক্ষীরা সদর"
-    private var selectedUnion = "ঈশ্বরীপুর / পোস্ট অফিস"
+    private var selectedThana = "শ্যামনগর"
+    private var selectedUnion = "ঈশ্বরীপুর"
     private var selectedMadhab = "হানাফী"
     private var userEmail = ""
 
@@ -88,7 +87,7 @@ class MainActivity : Activity() {
         if (h > 12) h -= 12
         if (h == 0) h = 12
         val hStr = String.format("%02d", h)
-        val mStr = String.format("%02d", m)
+        val mStr = String.format("%02d", minute % 60)
         return "${toBangla(hStr)}:${toBangla(mStr)}"
     }
 
@@ -102,13 +101,13 @@ class MainActivity : Activity() {
         currentTheme = prefs.getString("current_theme", "সাদা থিম (লাইট)") ?: "সাদা থিম (লাইট)"
         selectedDivision = prefs.getString("selected_division", "খুলনা") ?: "খুলনা"
         selectedDistrict = prefs.getString("selected_district", "সাতক্ষীরা") ?: "সাতক্ষীরা"
-        selectedThana = prefs.getString("selected_thana", "সাতক্ষীরা সদর") ?: "সাতক্ষীরা সদর"
-        selectedUnion = prefs.getString("selected_union", "ঈশ্বরীপুর / পোস্ট অফিস") ?: "ঈশ্বরীপুর / পোস্ট অফিস"
+        selectedThana = prefs.getString("selected_thana", "শ্যামনগর") ?: "শ্যামনগর"
+        selectedUnion = prefs.getString("selected_union", "ঈশ্বরীপুর") ?: "ঈশ্বরীপুর"
         selectedMadhab = prefs.getString("selected_madhab", "হানাফী") ?: "হানাফী"
         userEmail = prefs.getString("user_email", "") ?: ""
         activeZikrId = prefs.getString("active_zikr_id", "") ?: ""
 
-        // জিকির ডাটা লোড
+        // জিকির লোড
         val savedZikr = prefs.getString("zikr_items_json", null)
         zikrList.clear()
         if (savedZikr != null) {
@@ -125,7 +124,7 @@ class MainActivity : Activity() {
             activeZikrId = zikrList.firstOrNull()?.id ?: "1"
         }
 
-        // নোটপ্যাড ডাটা লোড
+        // নোটপ্যাড লোড
         val savedNotes = prefs.getString("note_items_json", null)
         noteList.clear()
         if (savedNotes != null) {
@@ -216,7 +215,9 @@ class MainActivity : Activity() {
             "zikr_list" -> showZikrListScreen()
             "hadith" -> showHadithScreen()
             "notepad" -> showNotepadScreen()
-            "amal" -> showAmalScreen()
+            "amal_folders" -> showAmalFoldersScreen()
+            "masnun_pdf_screen" -> showMasnunPdfScreen()
+            "manzil_pdf_screen" -> showManzilPdfScreen()
             "settings" -> showSettingsScreen()
         }
     }
@@ -278,8 +279,8 @@ class MainActivity : Activity() {
             Triple("হোম", "home", "🏠"),
             Triple("তাসবিহ", "tasbih", "📿"),
             Triple("হাদীস", "hadith", "📚"),
+            Triple("আমল ও মানযিল", "amal_folders", "📂"),
             Triple("নোটপ্যাড", "notepad", "📝"),
-            Triple("আমল", "amal", "✅"),
             Triple("প্রোফাইল", "settings", "👤")
         )
 
@@ -301,7 +302,7 @@ class MainActivity : Activity() {
 
             val text = TextView(this).apply {
                 text = item.first
-                textSize = 10.5f
+                textSize = 10f
                 gravity = Gravity.CENTER
                 typeface = Typeface.SERIF
                 setTextColor(if (current == item.second) accent else Color.parseColor("#94A3B8"))
@@ -366,22 +367,15 @@ class MainActivity : Activity() {
         liveTimerTextView?.text = toBangla(timeString)
     }
 
-    // ১. হোম স্ক্রিন (বিস্তারিত লাইভ লোকেশন, মাযহাব ও কাউন্টডাউন)
+    // ১. হোম স্ক্রিন
     private fun showHomeScreen() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = getThemeBackground()
         }
 
-        val scroll = ScrollView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(-1, 0, 1f)
-        }
-
-        val content = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(26, 26, 26, 26)
-        }
-
+        val scroll = ScrollView(this).apply { layoutParams = LinearLayout.LayoutParams(-1, 0, 1f) }
+        val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(26, 26, 26, 26) }
         val accent = getAccentColor()
 
         // লাইভ টাইমার কার্ড
@@ -415,7 +409,6 @@ class MainActivity : Activity() {
             setPadding(0, 6, 0, 10)
         }
 
-        // লাইভ লোকেশন বিস্তারিত বক্স
         val locationBox = TextView(this).apply {
             text = "📍 $selectedUnion, $selectedThana, $selectedDistrict, $selectedDivision"
             textSize = 12.5f
@@ -455,7 +448,7 @@ class MainActivity : Activity() {
         }
 
         val pTitle = TextView(this).apply {
-            text = "আজকের নামাজের সময়সূচী ($selectedDistrict | $selectedMadhab মাযহাব)"
+            text = "আজকের নামাজের সময়সূচী ($selectedDistrict | $selectedMadhab)"
             textSize = 16f
             typeface = Typeface.SERIF
             setTextColor(accent)
@@ -500,7 +493,7 @@ class MainActivity : Activity() {
         }
         content.addView(prayerCard)
 
-        // ডিজিটাল তাসবিহ কুইক বাটন
+        // ডিজিটাল তাসবিহ ও ফোল্ডার বাটন
         val btnTasbih = Button(this).apply {
             text = "📿 ডিজিটাল তাসবিহ চালু করুন"
             setBackgroundColor(accent)
@@ -515,6 +508,19 @@ class MainActivity : Activity() {
         }
         content.addView(btnTasbih)
 
+        val btnFolders = Button(this).apply {
+            text = "📂 মাসনূন আমল ও মানযিল ফোল্ডার"
+            setBackgroundColor(if (isWhiteTheme()) Color.parseColor("#0F766E") else Color.parseColor("#264536"))
+            setTextColor(Color.WHITE)
+            textSize = 14.5f
+            typeface = Typeface.SERIF
+            val lp = LinearLayout.LayoutParams(-1, -2)
+            lp.setMargins(0, 12, 0, 0)
+            layoutParams = lp
+            setOnClickListener { openScreen("amal_folders") }
+        }
+        content.addView(btnFolders)
+
         scroll.addView(content)
         root.addView(scroll)
         root.addView(createNavBar("home"))
@@ -523,17 +529,16 @@ class MainActivity : Activity() {
         startLiveTimer()
     }
 
-    // লোকেশন ও মাযহাব সেট করার ডায়ালগ
     private fun showLocationAndMadhabDialog() {
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(36, 16, 36, 16)
         }
 
-        val divInput = EditText(this).apply { hint = "বিভাগ (যেমন: খুলনা)"; setText(selectedDivision); typeface = Typeface.SERIF }
-        val distInput = EditText(this).apply { hint = "জেলা (যেমন: সাতক্ষীরা)"; setText(selectedDistrict); typeface = Typeface.SERIF }
-        val thanaInput = EditText(this).apply { hint = "থানা / উপজেলা (যেমন: শ্যামনগর)"; setText(selectedThana); typeface = Typeface.SERIF }
-        val unionInput = EditText(this).apply { hint = "ইউনিয়ন / পোস্ট অফিস (যেমন: ঈশ্বরীপুর)"; setText(selectedUnion); typeface = Typeface.SERIF }
+        val divInput = EditText(this).apply { hint = "বিভাগ"; setText(selectedDivision); typeface = Typeface.SERIF }
+        val distInput = EditText(this).apply { hint = "জেলা"; setText(selectedDistrict); typeface = Typeface.SERIF }
+        val thanaInput = EditText(this).apply { hint = "থানা"; setText(selectedThana); typeface = Typeface.SERIF }
+        val unionInput = EditText(this).apply { hint = "ইউনিয়ন"; setText(selectedUnion); typeface = Typeface.SERIF }
 
         val madhabSpinner = Spinner(this)
         val madhabs = arrayOf("হানাফী", "শাফেয়ী", "মালেকী", "হাম্বলী")
@@ -564,7 +569,7 @@ class MainActivity : Activity() {
             .show()
     }
 
-    // ২. ফুল স্ক্রিন ডিজিটাল তাসবিহ
+    // ২. ডিজিটাল তাসবিহ
     private fun showTasbihScreen() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -876,7 +881,298 @@ class MainActivity : Activity() {
             .show()
     }
 
-    // ৪. সিহাহ সিত্তাহ হাদীস কিতাব ভাণ্ডার (আরবি ও বাংলা)
+    // ৪. দুটি আলাদা ফোল্ডার মেনু (মাসনূন আমল ও মানযিল)
+    private fun showAmalFoldersScreen() {
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = getThemeBackground()
+        }
+
+        val scroll = ScrollView(this).apply { layoutParams = LinearLayout.LayoutParams(-1, 0, 1f) }
+        val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(26, 26, 26, 26) }
+        val accent = getAccentColor()
+
+        val h = TextView(this).apply {
+            text = "📂 মাসনূন আমল ও মানযিল ভাণ্ডার"
+            textSize = 20f
+            typeface = Typeface.SERIF
+            setTextColor(accent)
+            setTypeface(Typeface.SERIF, Typeface.BOLD)
+            setPadding(0, 0, 0, 6)
+        }
+        val sub = TextView(this).apply {
+            text = "সংকলনে: সাব্বির আহমাদ"
+            textSize = 13.5f
+            typeface = Typeface.SERIF
+            setTextColor(getSecondaryTextColor())
+            setPadding(0, 0, 0, 18)
+        }
+        content.addView(h)
+        content.addView(sub)
+
+        // ফোল্ডার ১: মাসনূন আমল কার্ড
+        val folder1 = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(22, 20, 22, 20)
+            val bg = GradientDrawable()
+            bg.setColor(getCardBgColor())
+            bg.cornerRadius = 24f
+            bg.setStroke(2, accent)
+            background = bg
+            val lp = LinearLayout.LayoutParams(-1, -2)
+            lp.setMargins(0, 0, 0, 16)
+            layoutParams = lp
+            setOnClickListener { openScreen("masnun_pdf_screen") }
+        }
+
+        val f1Title = TextView(this).apply {
+            text = "📁 ফোল্ডার ১: মাসনূন আমল (সকাল-সন্ধ্যা ও শয়ন)"
+            textSize = 16.5f
+            typeface = Typeface.SERIF
+            setTextColor(getTextColor())
+            setTypeface(Typeface.SERIF, Typeface.BOLD)
+        }
+        val f1Desc = TextView(this).apply {
+            text = "সকাল ও সন্ধ্যার নির্বাচিত মাসনূন দু'আ, সূরাসমূহ ও ঘুমানোর পূর্বের সুন্নাত আমলসমূহ।"
+            textSize = 13f
+            typeface = Typeface.SERIF
+            setTextColor(getSecondaryTextColor())
+            setPadding(0, 6, 0, 12)
+        }
+        val btnF1 = Button(this).apply {
+            text = "📖 আমলসমূহ পড়ুন ➔"
+            typeface = Typeface.SERIF
+            setBackgroundColor(accent)
+            setTextColor(Color.BLACK)
+            setOnClickListener { openScreen("masnun_pdf_screen") }
+        }
+        folder1.addView(f1Title)
+        folder1.addView(f1Desc)
+        folder1.addView(btnF1)
+        content.addView(folder1)
+
+        // ফোল্ডার ২: মানযিল আয়াত কার্ড
+        val folder2 = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(22, 20, 22, 20)
+            val bg = GradientDrawable()
+            bg.setColor(getCardBgColor())
+            bg.cornerRadius = 24f
+            bg.setStroke(2, Color.parseColor("#0F766E"))
+            background = bg
+            val lp = LinearLayout.LayoutParams(-1, -2)
+            lp.setMargins(0, 0, 0, 16)
+            layoutParams = lp
+            setOnClickListener { openScreen("manzil_pdf_screen") }
+        }
+
+        val f2Title = TextView(this).apply {
+            text = "📁 ফোল্ডার ২: মানযিল আয়াত (কুরআনী হিফাযত)"
+            textSize = 16.5f
+            typeface = Typeface.SERIF
+            setTextColor(getTextColor())
+            setTypeface(Typeface.SERIF, Typeface.BOLD)
+        }
+        val f2Desc = TextView(this).apply {
+            text = "কুরআনুল কারীমের রোগ-বালাই ও সকল অনিষ্ট থেকে বাঁচার হিফাযতের বিশেষ আয়াতসমূহ।"
+            textSize = 13f
+            typeface = Typeface.SERIF
+            setTextColor(getSecondaryTextColor())
+            setPadding(0, 6, 0, 12)
+        }
+        val btnF2 = Button(this).apply {
+            text = "📖 মানযিল তিলাওয়াত করুন ➔"
+            typeface = Typeface.SERIF
+            setBackgroundColor(if (isWhiteTheme()) Color.parseColor("#0F766E") else Color.parseColor("#264536"))
+            setTextColor(Color.WHITE)
+            setOnClickListener { openScreen("manzil_pdf_screen") }
+        }
+        folder2.addView(f2Title)
+        folder2.addView(f2Desc)
+        folder2.addView(btnF2)
+        content.addView(folder2)
+
+        scroll.addView(content)
+        root.addView(scroll)
+        root.addView(createNavBar("amal_folders"))
+        setContentView(root)
+    }
+
+    // ফোল্ডার ১-এর বিস্তারিত রিডার: মাসনূন আমল
+    private fun showMasnunPdfScreen() {
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = getThemeBackground()
+        }
+
+        val scroll = ScrollView(this).apply { layoutParams = LinearLayout.LayoutParams(-1, 0, 1f) }
+        val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(26, 26, 26, 26) }
+        val accent = getAccentColor()
+
+        val h = TextView(this).apply {
+            text = "মাসনূন আমল\nসংকলনে: সাব্বির আহমাদ"
+            textSize = 19f
+            typeface = Typeface.SERIF
+            setTextColor(accent)
+            setTypeface(Typeface.SERIF, Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 16)
+        }
+        content.addView(h)
+
+        val items = listOf(
+            "সূরা আল-ফাতিহা (সকাল ও সন্ধ্যায় ৩ বার)" to "بِسْمِ اللهِ الرَّحْمَنِ الرَّحِيمِ (1) الْحَمْدُ لِلَّهِ رَبِّ الْعَلَمِينَ (٢) الرَّحْمَنِ الرَّحِيمِ (۳) مَلِكِ يَوْمِ الدِّينِ (4) إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ (٥) اِهْدِنَا الصِّرَاطَ الْمُسْتَقِيمَ (6) صِرَاطَ الَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ الْمَغْضُوبِ عَلَيْهِمْ وَلَا الضَّالِّينَ (۷)",
+            "আয়াতুল কুরসি (সকাল ও সন্ধ্যায় ৩ বার)" to "اللهُ لَا إِلَهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ ، لَا تَأْخُذُهُ سِنَةٌ وَلَا نَوْمٌ لَهُ مَا فِي السَّمَاتِ وَمَا فِي الْأَرْضِ مَنْ ذَا الَّذِي يَشْفَعُ عِنْدَةً إِلَّا بِإِذْنِهِ يَعْلَمُ مَا بَيْنَ أَيْدِيهِمْ وَمَا خَلْفَهُمْ وَلَا يُحِيطُونَ بِشَيْءٍ مِّنْ عِلْمِهِ إِلَّا بِمَا شَاءَ وَسِعَ كُرْسِيُّهُ السَّمَوَاتِ وَالْأَرْضَ وَلَا يَئُودُهُ حِفْظُهُمَا وَهُوَ الْعَلِيُّ الْعَظِيمُ",
+            "সূরা আল-কাফিরূন (সকাল ও সন্ধ্যায় ৩ বার)" to "بِسْمِ اللهِ الرَّحْمَنِ الرَّحِيمِ\nقُلْ يَأَيُّهَا الْكُفِرُونَ (١) لَا أَعْبُدُ مَا تَعْبُدُونَ (۲) وَلَا أَنْتُمْ عُبِدُونَ مَا أَعْبُدُ (٣) وَلَا أَنَا عَابِدٌ مَّا عَبَدْتُمْ (٤) وَلَا أَنْتُمْ عُبِدُونَ مَا أَعْبُدُ (٥) لَكُمْ دِينَكُمْ وَلِيَ دِينِ (٦)",
+            "সূরা আল-ইখলাস (সকাল ও সন্ধ্যায় ৩ বার)" to "بِسْمِ اللهِ الرَّحْمَنِ الرَّحِيمِ\nقُلْ هُوَ اللهُ أَحَدٌ (۱) اللهُ الصَّمَدُ (۲) لَمْ يَلِدْ وَلَمْ يُولَدُ (۳) وَلَمْ يَكُن لَّهُ كُفُوًا أَحَدٌ (٤)",
+            "সূরা আল-ফালাক (সকাল ও সন্ধ্যায় ৩ বার)" to "بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ\nقُلْ أَعُوذُ بِرَبِّ الْفَلَقِ (1) مِنْ شَرِّ مَا خَلَقَ (۲) وَمِنْ شَرِّ غَاسِقٍ إِذَا وَقَبَ (۳) وَمِنْ شَرِّ النَّفْثَتِ فِي الْعُقَدِ (٤) وَمِنْ شَرِّ حَاسِدٍ إِذَا حَسَدَ (٥)",
+            "সূরা আন-নাস (সকাল ও সন্ধ্যায় ৩ বার)" to "بِسْمِ اللهِ الرَّحْمَنِ الرَّحِيمِ\nقُلْ أَعُوذُ بِرَبِّ النَّاسِ (۱) مَلِكِ النَّاسِ (۲) إِلَهِ النَّاسِ (۳) مِنْ شَرِّ الْوَسْوَاسِ الْخَنَّاسِ (٤) الَّذِي يُوَسْوِسُ فِي صُدُورِ النَّاسِ (٥) مِنَ الْجِنَّةِ وَالنَّاسِ (٦)",
+            "সকাল ও সন্ধ্যায় ৩ বার" to "أَعُوذُ بِكَلِمَاتِ اللَّهِ التَّامَّاتِ الَّتِي لَا يُجَاوِزُهُنَّ بَرَّ وَلَا فَاجِرٌ ، مِنْ شَرِّ مَا خَلَقَ وَ مَا خَلَقَ وَذَرَأَ وَبَرَأَ، وَمِنْ شَرِّ مَا يَنْزِلُ مِنَ السَّمَاءِ ، وَمِنْ شَرِّ مَا يَعْرُجُ فِيهَا ، وَمِنْ شَرِّ مَا ذَرَأَ فِي الْأَرْضِ، وَمِنْ شَرِّ مَا يَخْرُجُ مِنْهَا، وَمِنْ شَرِّ طَوَارِقِ اللَّيْلِ وَالنَّهَارِ، وَمِنْ شَرِّ كُلِّ طَارِقٍ إِلَّا طَارِقَا يَطْرُقُ بِخَيْرٍ يَا رَحْمَنُ.",
+            "সকাল ও সন্ধ্যায় ১০ বার" to "سُبْحَانَ اللَّهِ ، وَالْحَمْدُ لِلَّهِ ، وَلَا إِلَهَ إِلَّا اللَّهُ ، وَاللَّهُ أَكْبَرُ ، وَلَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ الْعَلِيِّ الْعَظِيمِ، هُوَ الْأَوَّلُ وَالْآخِرُ وَالظَّاهِرُ وَالْبَاطِنُ، بِيَدِهِ الْخَيْرُ ، يُحْيِي وَيُمِيتُ ، وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ",
+            "সকাল ও সন্ধ্যায় ১০০ বার" to "لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ ، وَلَهُ الْحَمْدُ ، وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ",
+            "সকাল ও সন্ধ্যায় ৩ বার" to "أَعُوذُ بِكَلِمَاتِ اللهِ التَّامَّةِ مِنْ غَضَبِهِ وَعِقَابِهِ وَشَرِّ عِبَادِهِ وَمِنْ هَمَزَاتِ الشَّيَاطِينِ وَأَنْ يَحْضُرُونِ",
+            "সকাল ও সন্ধ্যায় ৭ বার" to "حَسْبِيَ اللَّهُ لَا إِلَهَ إِلَّا هُوَ عَلَيْهِ تَوَكَّلْتُ ، وَهُوَ رَبُّ الْعَرْشِ الْعَظِيمِ",
+            "সকাল ও সন্ধ্যায় ৩ বার" to "بِسْمِ اللَّهِ الَّذِي لَا يَضُرُ مَعَ اسْمِهِ شَيْءٌ فِي الْأَرْضِ وَلَا فِي السَّمَاءِ وَهُوَ السَّمِيعُ الْعَلِيمُ",
+            "সায়্যিদুল ইস্তিগফার (সকাল ও সন্ধ্যায় ১ বার)" to "اللَّهُمَّ أَنْتَ رَبِّي لَا إِلَهَ إِلَّا أَنْتَ، خَلَقْتَنِي وَأَنَا عَبْدُكَ ، وَأَنَا عَلَى عَهْدِكَ وَوَعْدِكَ مَا اسْتَطَعْتُ ، أَعُوذُ بِكَ مِنْ شَرِّ مَا صَنَعْتُ ، أَبُوءُ لَكَ بِنِعْمَتِكَ عَلَيَّ، وَأَبُوءُ لَكَ بِذَنْبِي فَاغْفِرْ لِي، فَإِنَّهُ لَا يَغْفِرُ الذُّنُوبَ إِلَّا أَنْتَ",
+            "ঘুমানোর পূর্বের আমলসমূহ" to "১. ওযু করে ঘুমানো।\n২. শোয়ার পূর্বে বিস্মিল্লাহ পড়ে বিছানা ঝেড়ে শোয়া।\n৩. আয়াতুল কুরসি পড়া।\n৪. সূরা এখলাস, সূরা ফালাক এবং সূরা নাস পড়ে হাতের তালুতে ফু দিয়ে সমস্ত শরীরে হাত বুলিয়ে ঘুমানো।\n৫. ঘুমের দোয়া: (اللَّهُمَّ بِاسْمِكَ أَمُوتُ وَأَحْيَا)\n৬. ঘুম থেকে উঠে দোয়া: (الْحَمْدُ لِلَّهِ الَّذِي أَحْيَانَا بَعْدَ مَا أَمَاتَنَا وَإِلَيْهِ النُّشُورُ)"
+        )
+
+        for (item in items) {
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(20, 16, 20, 16)
+                val bg = GradientDrawable()
+                bg.setColor(getCardBgColor())
+                bg.cornerRadius = 20f
+                bg.setStroke(1, Color.parseColor("#CBD5E1"))
+                background = bg
+                val lp = LinearLayout.LayoutParams(-1, -2)
+                lp.setMargins(0, 0, 0, 14)
+                layoutParams = lp
+            }
+
+            val t = TextView(this).apply {
+                text = item.first
+                textSize = 15.5f
+                typeface = Typeface.SERIF
+                setTextColor(accent)
+                setTypeface(Typeface.SERIF, Typeface.BOLD)
+                setPadding(0, 0, 0, 6)
+            }
+            val b = TextView(this).apply {
+                text = item.second
+                textSize = 17f
+                typeface = Typeface.SERIF
+                setTextColor(getTextColor())
+                setLineSpacing(10f, 1.2f)
+            }
+
+            card.addView(t)
+            card.addView(b)
+            content.addView(card)
+        }
+
+        val btnBack = Button(this).apply {
+            text = "⬅ ফোল্ডার তালিকায় ফিরে যান"
+            typeface = Typeface.SERIF
+            setBackgroundColor(if (isWhiteTheme()) Color.parseColor("#0F766E") else Color.parseColor("#264536"))
+            setTextColor(Color.WHITE)
+            setOnClickListener { openScreen("amal_folders") }
+        }
+        content.addView(btnBack)
+
+        scroll.addView(content)
+        root.addView(scroll)
+        root.addView(createNavBar("amal_folders"))
+        setContentView(root)
+    }
+
+    // ফোল্ডার ২-এর বিস্তারিত রিডার: মানযিল আয়াত
+    private fun showManzilPdfScreen() {
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = getThemeBackground()
+        }
+
+        val scroll = ScrollView(this).apply { layoutParams = LinearLayout.LayoutParams(-1, 0, 1f) }
+        val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(26, 26, 26, 26) }
+        val accent = getAccentColor()
+
+        val h = TextView(this).apply {
+            text = "মানযিল (কুরআনী হিফাযত)"
+            textSize = 20f
+            typeface = Typeface.SERIF
+            setTextColor(accent)
+            setTypeface(Typeface.SERIF, Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 16)
+        }
+        content.addView(h)
+
+        val manzilAyats = listOf(
+            "১. সূরা আল-ইনশিকাক (১-২৫)" to "بِسْمِ اللهِ الرَّحْمَنِ الرَّحِيمِ\nإِذَا السَّمَاءُ انْشَقَّتْ ، وَأَذِنَتْ لِرَبِّهَا وَحُقَّتْ ، وَإِذَا الْأَرْضُ مُدَّتْ وَأَلْقَتْ مَا فِيهَا وَتَخَلَّتْ ، وَأَذِنَتْ لِرَبِّهَا وَحُقَّتْ ، يَأَيُّهَا الْإِنْسَانُ إِنَّكَ كَادِحٌ إِلَى رَبِّكَ كَدْحًا فَمُلَقِيهِ ، فَأَمَّا مَنْ أُوتِيَ كِتَبَهُ بِيَمِينِهِ ، فَسَوْفَ يُحَاسَبُ حِسَابًا يَسِيرًا ، وَيَنْقَلِبُ إِلَى أَهْلِهِ مَسْرُورًا ، وَأَمَّا مَنْ أُوتِيَ كِتَبَهُ وَرَاءَ ظَهْرِهِ ، فَسَوْفَ يَدْعُوا ثُبُورًا ، وَيَصْلَى سَعِيرًا ، إِنَّهُ كَانَ فِي أَهْلِهِ مَسْرُورًا ، إِنَّهُ ظَنَّ أَنْ لَنْ يَحُورَ ، بَلَى إِنَّ رَبَّهُ كَانَ بِهِ بَصِيرًا ، فَلَا أُقْسِمُ بِالشَّفَقِ ، وَالَّيْلِ وَمَا وَسَقَ ، وَالْقَمَرِ إِذَا اتَّسَقَ ، لَتَرْكَبُنَّ طَبَقًا عَنْ طَبَقٍ ، فَمَا لَهُمْ لَا يُؤْمِنُونَ ، وَإِذَا قُرِئَ عَلَيْهِمُ الْقُرْآنُ لَا يَسْجُدُونَ ، بَلِ الَّذِينَ كَفَرُوا يُكَذِّبُونَ ، وَاللَّهُ أَعْلَمُ بِمَا يُوعُونَ ، فَبَشِّرْهُمْ بِعَذَابٍ أَلِيمٍ ، إِلَّا الَّذِينَ آمَنُوا وَعَمِلُوا الصَّالِحَتِ لَهُمْ أَجْرٌ غَيْرُ مَمْنُونٍ",
+            "২. সূরা আল-ফাতিহা" to "بِسْمِ اللهِ الرَّحْمَنِ الرَّحِيمِ\nالْحَمْدُ لِلَّهِ رَبِّ الْعَلَمِينَ ، الرَّحْمَنِ الرَّحِيمِ ، مَلِكِ يَوْمِ الدِّينِ ، إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ ، اهْدِنَا الصِّرَاطَ الْمُسْتَقِيمَ ، صِرَاطَ الَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ الْمَغْضُوبِ عَلَيْهِمْ وَلَا الضَّالِّينَ",
+            "৩. সূরা আল-বাকারাহ (১-৫)" to "بِسْمِ اللهِ الرَّحْمَنِ الرَّحِيمِ\nالم ، ذَلِكَ الْكِتَبُ لَا رَيْبَ فِيهِ هُدًى لِلْمُتَّقِينَ ، الَّذِينَ يُؤْمِنُونَ بِالْغَيْبِ وَيُقِيمُونَ الصَّلوةَ وَمِمَّا رَزَقْنَاهُمْ يُنْفِقُونَ ، وَالَّذِينَ يُؤْمِنُونَ بِمَا أُنْزِلَ إِلَيْكَ وَمَا أُنْزِلَ مِنْ قَبْلِكَ وَبِالْآخِرَةِ هُمْ يُوقِنُونَ ، أُولَئِكَ عَلَى هُدًى مِنْ رَبِّهِمْ وَأُولَئِكَ هُمُ الْمُفْلِحُونَ",
+            "৪. আয়াতুল কুরসি ও বাকারাহ শেষ রুকু" to "وَإِلَهُكُمْ إِلَهٌ وَاحِدٌ لَا إِلَهَ إِلَّا هُوَ الرَّحْمَنُ الرَّحِيمُ\n\nاللهُ لَا إِلَهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ لَا تَأْخُذُهُ سِنَةٌ وَلَا نَوْمٌ لَهُ مَا فِي السَّمَوَاتِ وَمَا فِي الْأَرْضِ مَنْ ذَا الَّذِي يَشْفَعُ عِنْدَهُ إِلَّا بِإِذْنِهِ يَعْلَمُ مَا بَيْنَ أَيْدِيهِمْ وَمَا خَلْفَهُمْ وَلَا يُحِيطُونَ بِشَيْءٍ مِنْ عِلْمِهِ إِلَّا بِمَا شَاءَ وَسِعَ كُرْسِيُّهُ السَّمَوَاتِ وَالْأَرْضَ وَلَا يَئُودُهُ حِفْظُهُمَا وَهُوَ الْعَلِيُّ الْعَظِيمُ\n\nآمَنَ الرَّسُولُ بِمَا أُنْزِلَ إِلَيْهِ مِنْ رَّبِّهِ وَالْمُؤْمِنُونَ كُلٌّ آمَنَ بِاللَّهِ وَمَلَئِكَتِهِ وَكُتُبِهِ وَرُسُلِهِ لَا نُفَرِّقُ بَيْنَ أَحَدٍ مِنْ رُسُلِهِ وَقَالُوا سَمِعْنَا وَأَطَعْنَا غُفْرَانَكَ رَبَّنَا وَإِلَيْكَ الْمَصِيرُ ، لَا يُكَلِّفُ اللَّهُ نَفْسًا إِلَّا وُسْعَهَا لَهَا مَا كَسَبَتْ وَعَلَيْهَا مَا اكْتَسَبَتْ رَبَّنَا لَا تُؤَاخِذْنَا إِنْ نَسِينَا أَوْ أَخْطَأْنَا رَبَّنَا وَلَا تَحْمِلْ عَلَيْنَا إِصْرًا كَمَا حَمَلْتَهُ عَلَى الَّذِينَ مِنْ قَبْلِنَا رَبَّنَا وَلَا تُحَمِّلْنَا مَا لَا طَاقَةَ لَنَا بِهِ وَاعْفُ عَنَّا وَاغْفِرْ لَنَا وَارْحَمْنَا أَنْتَ مَوْلَانَا فَانْصُرْنَا عَلَى الْقَوْمِ الْكَفِرِينَ",
+            "৫. সূরা আলে ইমরান (১৮, ২৬-২৭)" to "شَهِدَ اللَّهُ أَنَّهُ لَا إِلَهَ إِلَّا هُوَ وَالْمَلَئِكَةُ وَأُولُوا الْعِلْمِ قَائِمًا بِالْقِسْطِ لَا إِلَهَ إِلَّا هُوَ الْعَزِيزُ الْحَكِيمُ\n\nقُلِ اللَّهُمَّ مَلِكَ الْمُلْكِ تُؤْتِي الْمُلْكَ مَنْ تَشَاءُ وَتَنْزِعُ الْمُلْكَ مِمَّنْ تَشَاءُ وَتُعِزُّ مَنْ تَشَاءُ وَتُذِلُّ مَنْ تَشَاءُ بِيَدِكَ الْخَيْرُ إِنَّكَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ ، تُولِجُ الَّيْلَ فِي النَّهَارِ وَتُولِجُ النَّهَارَ فِي الَّيْلِ وَتُخْرِجُ الْحَيَّ مِنَ الْمَيِّتِ وَتُخْرِجُ الْمَيِّتَ مِنَ الْحَيِّ وَتَرْزُقُ مَنْ تَشَاءُ بِغَيْرِ حِسَابٍ",
+            "৬. সূরা আল-আ'রাফ (৫৪-৫৬)" to "إِنَّ رَبَّكُمُ اللَّهُ الَّذِي خَلَقَ السَّمَوَاتِ وَالْأَرْضَ فِي سِتَّةِ أَيَّامٍ ثُمَّ اسْتَوَى عَلَى الْعَرْشِ يُغْشِي الَّيْلَ النَّهَارَ يَطْلُبُهُ حَثِيثًا وَالشَّمْسَ وَالْقَمَرَ وَالنُّجُومَ مُسَخَّرَاتٍ بِأَمْرِهِ أَلَا لَهُ الْخَلْقُ وَالْأَمْرُ تَبَارَكَ اللَّهُ رَبُّ الْعَلَمِينَ ، ادْعُوا رَبَّكُمْ تَضَرُّعًا وَخُفْيَةً إِنَّهُ لَا يُحِبُّ الْمُعْتَدِينَ ، وَلَا تُفْسِدُوا فِي الْأَرْضِ بَعْدَ إِصْلَاحِهَا وَادْعُوهُ خَوْفًا وَطَمَعًا إِنَّ رَحْمَتَ اللَّهِ قَرِيبٌ مِّنَ الْمُحْسِنِينَ",
+            "৭. সূরা আল-ইসরা (১১০-১১১) ও আল-মুমিনূন (১১৫-১১৮)" to "قُلِ ادْعُوا اللَّهَ أَوِ ادْعُوا الرَّحْمَنَ أَيًّا مَّا تَدْعُوا فَلَهُ الْأَسْمَاءُ الْحُسْنَى وَلَا تَجْهَرْ بِصَلَاتِكَ وَلَا تُخَافِتْ بِهَا وَابْتَغِ بَيْنَ ذَلِكَ سَبِيلًا ، وَقُلِ الْحَمْدُ لِلَّهِ الَّذِي لَمْ يَتَّخِذْ وَلَدًا وَلَمْ يَكُنْ لَهُ شَرِيكٌ فِي الْمُلْكِ وَلَمْ يَكُنْ لَهُ وَلِيٌّ مِنَ الذُّلِّ وَكَبِّرْهُ تَكْبِيرًا\n\nأَفَحَسِبْتُمْ أَنَّمَا خَلَقْنَاكُمْ عَبَثًا وَأَنَّكُمْ إِلَيْنَا لَا تُرْجَعُونَ ، فَتَعَالَى اللَّهُ الْمَلِكُ الْحَقُّ لَا إِلَهَ إِلَّا هُوَ رَبُّ الْعَرْشِ الْكَرِيمِ ، وَمَنْ يَدْعُ مَعَ اللَّهِ إِلَهًا آخَرَ لَا بُرْهَانَ لَهُ بِهِ فَإِنَّمَا حِسَابُهُ عِنْدَ رَبِّهِ إِنَّهُ لَا يُفْلِحُ الْكَفِرُونَ ، وَقُلْ رَبِّ اغْفِرْ وَارْحَمْ وَأَنْتَ خَيْرُ الرَّاحِمِينَ",
+            "৮. সূরা আস-সাফফাত (১-১১)" to "بِسْمِ اللهِ الرَّحْمَنِ الرَّحِيمِ\nوَالصَّافَّاتِ صَفًّا ، فَالزَّاجِرَاتِ زَجْرًا ، فَالتَّالِيَاتِ ذِكْرًا ، إِنَّ إِلَهَكُمْ لَوَاحِدٌ ، رَبُّ السَّمَوَاتِ وَالْأَرْضِ وَمَا بَيْنَهُمَا وَرَبُّ الْمَشَارِقِ ، إِنَّا زَيَّنَّا السَّمَاءَ الدُّنْيَا بِزِينَةٍ الْكَوَاكِبِ ، وَحِفْظًا مِنْ كُلِّ شَيْطَانٍ مَارِدٍ ، لَا يَسَّمَّعُونَ إِلَى الْمَلَإِ الْأَعْلَى وَيُقْذَفُونَ مِنْ كُلِّ جَانِبٍ ، دُحُورًا وَلَهُمْ عَذَابٌ وَاصِبٌ ، إِلَّا مَنْ خَطِفَ الْخَطْفَةَ فَأَتْبَعَهُ شِهَابٌ ثَاقِبٌ ، فَاسْتَفْتِهِمْ أَهُمْ أَشَدُّ خَلْقًا أَمْ مَّنْ خَلَقْنَا إِنَّا خَلَقْنَاهُمْ مِنْ طِينٍ لَازِبٍ",
+            "৯. সূরা আর-রহমান (৩৩-৩৭) ও আল-হাশর (২১-২৪)" to "يَا مَعْشَرَ الْجِنِّ وَالْإِنْسِ إِنِ اسْتَطَعْتُمْ أَنْ تَنْفُذُوا مِنْ أَقْطَارِ السَّمَوَاتِ وَالْأَرْضِ فَانْفُذُوا لَا تَنْفُذُونَ إِلَّا بِسُلْطَانٍ ، فَبِأَيِّ آلَاءِ رَبِّكُمَا تُكَذِّبَانِ ، يُرْسَلُ عَلَيْكُمَا شُوَاظٌ مِنْ نَارٍ وَنُحَاسٌ فَلَا تَنْتَصِرَانِ ، فَبِأَيِّ آلَاءِ رَبِّكُمَا تُكَذِّبَانِ ، فَإِذَا انْشَقَّتِ السَّمَاءُ فَكَانَتْ وَرْدَةً كَالدِّهَانِ ، فَبِأَيِّ آلَاءِ رَبِّكُمَا تُكَذِّبَانِ\n\nلَوْ أَنْزَلْنَا هَذَا الْقُرْآنَ عَلَى جَبَلٍ لَرَأَيْتَهُ خَاشِعًا مُتَصَدِّعًا مِنْ خَشْيَةِ اللَّهِ وَتِلْكَ الْأَمْثَالُ نَضْرِبُهَا لِلنَّاسِ لَعَلَّهُمْ يَتَفَكَّরُونَ ، هُوَ اللَّهُ الَّذِي لَا إِلَهَ إِلَّا هُوَ عَالِمُ الْغَيْبِ وَالشَّهَادَةِ هُوَ الرَّحْمَنُ الرَّحِيمُ ، هُوَ اللَّهُ الَّذِي لَا إِلَهَ إِلَّا هُوَ الْمَلِكُ الْقُدُّوسُ السَّلَامُ الْمُؤْمِنُ الْمُهَيْمِنُ الْعَزِيزُ الْجَبَّارُ الْمُتَكَبِّرُ سُبْحَانَ اللَّهِ عَمَّا يُشْرِكُونَ ، هُوَ اللَّهُ الْخَالِقُ الْبَارِئُ الْمُصَوِّرُ لَهُ الْأَسْمَاءُ الْحُسْنَى يُسَبِّحُ لَهُ مَا فِي السَّمَوَاتِ وَالْأَرْضِ وَهُوَ الْعَزِيزُ الْحَكِيمُ",
+            "১০. সূরা আল-জিন (১-৪) ও শেষ ৪ কুল" to "بِسْمِ اللهِ الرَّحْمَنِ الرَّحِيمِ\nقُلْ أُوحِيَ إِلَيَّ أَنَّهُ اسْتَمَعَ نَفَرٌ مِنَ الْجِنِّ فَقَالُوا إِنَّا سَمِعْنَا قُرْآنًا عَجَبًا ، يَهْدِي إِلَى الرُّشْدِ فَآمَنَّا بِهِ وَلَنْ نُشْرِكَ بِرَبِّنَا أَحَدًا ، وَأَنَّهُ تَعَالَى جَدُّ رَبِّنَا مَا اتَّخَذَ صَاحِبَةً وَلَا وَلَدًا ، وَأَنَّهُ كَانَ يَقُولُ سَفِيهُنَا عَلَى اللَّهِ شَطَطًا\n\n(সূরা আল-কাফিরূন, সূরা আল-ইখলাস, সূরা আল-ফালাক, সূরা আন-নাস)"
+        )
+
+        for (item in manzilAyats) {
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(20, 16, 20, 16)
+                val bg = GradientDrawable()
+                bg.setColor(getCardBgColor())
+                bg.cornerRadius = 20f
+                bg.setStroke(1, Color.parseColor("#CBD5E1"))
+                background = bg
+                val lp = LinearLayout.LayoutParams(-1, -2)
+                lp.setMargins(0, 0, 0, 14)
+                layoutParams = lp
+            }
+
+            val t = TextView(this).apply {
+                text = item.first
+                textSize = 15.5f
+                typeface = Typeface.SERIF
+                setTextColor(accent)
+                setTypeface(Typeface.SERIF, Typeface.BOLD)
+                setPadding(0, 0, 0, 6)
+            }
+            val b = TextView(this).apply {
+                text = item.second
+                textSize = 17f
+                typeface = Typeface.SERIF
+                setTextColor(getTextColor())
+                setLineSpacing(10f, 1.2f)
+            }
+
+            card.addView(t)
+            card.addView(b)
+            content.addView(card)
+        }
+
+        val btnBack = Button(this).apply {
+            text = "⬅ ফোল্ডার তালিকায় ফিরে যান"
+            typeface = Typeface.SERIF
+            setBackgroundColor(if (isWhiteTheme()) Color.parseColor("#0F766E") else Color.parseColor("#264536"))
+            setTextColor(Color.WHITE)
+            setOnClickListener { openScreen("amal_folders") }
+        }
+        content.addView(btnBack)
+
+        scroll.addView(content)
+        root.addView(scroll)
+        root.addView(createNavBar("amal_folders"))
+        setContentView(root)
+    }
+
+    // ৫. সিহাহ সিত্তাহ হাদীস কিতাব ভাণ্ডার
     private fun showHadithScreen() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -888,7 +1184,7 @@ class MainActivity : Activity() {
         val accent = getAccentColor()
 
         val h = TextView(this).apply {
-            text = "📚 সিহাহ সিত্তাহ (৬টি বিশুদ্ধ হাদীস কিতাব)"
+            text = "📚 সিহাহ সিত্তাহ (বিশুদ্ধ হাদীস কিতাব)"
             textSize = 19f
             typeface = Typeface.SERIF
             setTextColor(accent)
@@ -968,7 +1264,7 @@ class MainActivity : Activity() {
         setContentView(root)
     }
 
-    // ৫. ব্যক্তিগত ইসলামিক নোটপ্যাড (Notepad with Gmail sync)
+    // ৬. ব্যক্তিগত ইসলামিক নোটপ্যাড
     private fun showNotepadScreen() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -1097,13 +1393,13 @@ class MainActivity : Activity() {
         }
 
         val titleInput = EditText(this).apply {
-            hint = "নোটের টাইটেল (যেমন: জুমার দিনের বিশেষ আমল)"
+            hint = "নোটের টাইটেল"
             setText(existingNote?.title ?: "")
             typeface = Typeface.SERIF
         }
 
         val contentInput = EditText(this).apply {
-            hint = "নোটের বিস্তারিত বিবরণ এখানে লিখুন..."
+            hint = "নোটের বিবরণ..."
             setText(existingNote?.content ?: "")
             typeface = Typeface.SERIF
             minLines = 4
@@ -1135,61 +1431,7 @@ class MainActivity : Activity() {
             .show()
     }
 
-    // ৬. দৈনিক আমল চেকলিস্ট
-    private fun showAmalScreen() {
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = getThemeBackground()
-        }
-
-        val scroll = ScrollView(this).apply { layoutParams = LinearLayout.LayoutParams(-1, 0, 1f) }
-        val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(30, 30, 30, 30) }
-
-        val h = TextView(this).apply {
-            text = "দৈনিক আমল চেকলিস্ট"
-            textSize = 20f
-            typeface = Typeface.SERIF
-            setTextColor(getAccentColor())
-            setTypeface(Typeface.SERIF, Typeface.BOLD)
-            setPadding(0, 0, 0, 18)
-        }
-        content.addView(h)
-
-        val amols = listOf(
-            "সকালের মাসনুন দোয়া ও আয়াতুল কুরসি",
-            "ফজর নামাজ আদায়",
-            "ইশরাক নামাজ আদায়",
-            "চাশত / দুহা নামাজ আদায়",
-            "যোহর নামাজ আদায়",
-            "আসর নামাজ আদায়",
-            "সন্ধ্যার মাসনুন জিকির ও ৩ কুল",
-            "মাগরিব নামাজ আদায়",
-            "এশা ও বিতর নামাজ আদায়",
-            "সুরা মুলক তিলাওয়াত"
-        )
-
-        val dayKey = "day_" + SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
-        for ((idx, am) in amols.withIndex()) {
-            val cb = CheckBox(this).apply {
-                text = am
-                textSize = 15.5f
-                typeface = Typeface.SERIF
-                setTextColor(getTextColor())
-                isChecked = prefs.getBoolean("${dayKey}_$idx", false)
-                setOnCheckedChangeListener { _, isChecked ->
-                    prefs.edit().putBoolean("${dayKey}_$idx", isChecked).apply()
-                }
-            }
-            content.addView(cb)
-        }
-
-        scroll.addView(content)
-        root.addView(scroll)
-        root.addView(createNavBar("amal"))
-        setContentView(root)
-    }
-
-    // ৭. সেটিংস, জিমেইল ব্যাকআপ ও ডেভেলপার সাব্বির আহমাদ পরিচিতি
+    // ৭. প্রোফাইল ও ডেভেলপার সাব্বির আহমাদ পরিচিতি
     private fun showSettingsScreen() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -1210,7 +1452,7 @@ class MainActivity : Activity() {
         }
         content.addView(h)
 
-        // ডেভেলপার ও উদ্যোক্তা পরিচিতি কার্ড
+        // ডেভেলপার ও উদ্যোক্তা পরিচিতি
         val devCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(22, 18, 22, 18)
@@ -1261,7 +1503,7 @@ class MainActivity : Activity() {
         devCard.addView(btnCall)
         content.addView(devCard)
 
-        // জিমেইল ক্লাউড স্টোরেজ কার্ড
+        // জিমেইল ক্লাউড ব্যাকআপ
         val backupCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(20, 16, 20, 16)
