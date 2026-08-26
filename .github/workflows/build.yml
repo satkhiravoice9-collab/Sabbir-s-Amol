@@ -22,7 +22,7 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
 
-    - name: Setup Project Structure and Configuration
+    - name: Prepare Project Files
       run: |
         mkdir -p app/src/main/res/values
         mkdir -p app/src/main/res/drawable
@@ -69,8 +69,8 @@ jobs:
                 applicationId "com.sabbirsamol.app"
                 minSdk 26
                 targetSdk 34
-                versionCode 10
-                versionName "10.0"
+                versionCode 11
+                versionName "11.0"
             }
 
             compileOptions {
@@ -83,17 +83,17 @@ jobs:
             }
 
             buildTypes {
-                release {
+                debug {
                     minifyEnabled false
                 }
-                debug {
+                release {
                     minifyEnabled false
                 }
             }
         }
 
         dependencies {
-            implementation 'androidx.core:core:1.12.0'
+            implementation "org.jetbrains.kotlin:kotlin-stdlib:1.9.0"
         }
         EOF
 
@@ -179,7 +179,7 @@ jobs:
         cache-disabled: true
 
     - name: Build APK
-      run: gradle assembleDebug --no-daemon
+      run: gradle assembleDebug --no-daemon --stacktrace
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
