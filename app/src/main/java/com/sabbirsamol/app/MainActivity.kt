@@ -10,6 +10,8 @@ import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.view.Gravity
@@ -34,7 +36,28 @@ class MainActivity : Activity() {
     private val screenStack = Stack<String>()
     private val zikrList = mutableListOf<ZikrItem>()
     private var activeZikrId: String = ""
-    private var currentTheme = "কাবা থিম (ডার্ক গোল্ড)"
+    private var currentTheme = "সাদা থিম (লাইট)"
+    private var selectedDistrict = "সাতক্ষীরা"
+    private var userEmail = ""
+
+    private val timerHandler = Handler(Looper.getMainLooper())
+    private var timerRunnable: Runnable? = null
+    private var liveTimerTextView: TextView? = null
+    private var liveWaqtTextView: TextView? = null
+
+    // জেলাভিত্তিক সময়ের সমন্বয় (মিনিটে)
+    private val districtOffsets = mapOf(
+        "সাতক্ষীরা" to 4,
+        "ঢাকা" to 0,
+        "চট্টগ্রাম" to -5,
+        "খুলনা" to 3,
+        "রাজশাহী" to 7,
+        "সিলেট" to -6,
+        "বরিশাল" to 1,
+        "রংপুর" to 6,
+        "কুষ্টিয়া" to 5,
+        "যশোর" to 4
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,7 +66,9 @@ class MainActivity : Activity() {
     }
 
     private fun loadAllData() {
-        currentTheme = prefs.getString("current_theme", "কাবা থিম (ডার্ক গোল্ড)") ?: "কাবা থিম (ডার্ক গোল্ড)"
+        currentTheme = prefs.getString("current_theme", "সাদা থিম (লাইট)") ?: "সাদা থিম (লাইট)"
+        selectedDistrict = prefs.getString("selected_district", "সাতক্ষীরা") ?: "সাতক্ষীরা"
+        userEmail = prefs.getString("user_email", "") ?: ""
         activeZikrId = prefs.getString("active_zikr_id", "") ?: ""
 
         val savedJson = prefs.getString("zikr_items_json", null)
@@ -98,6 +123,8 @@ class MainActivity : Activity() {
             .putString("zikr_items_json", array.toString())
             .putString("active_zikr_id", activeZikrId)
             .putString("current_theme", currentTheme)
+            .putString("selected_district", selectedDistrict)
+            .putString("user_email", userEmail)
             .apply()
     }
 
@@ -127,6 +154,7 @@ class MainActivity : Activity() {
     }
 
     private fun renderScreen(name: String) {
+        stopLiveTimer()
         when (name) {
             "home" -> showHomeScreen()
             "tasbih" -> showTasbihScreen()
@@ -146,42 +174,48 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun isWhiteTheme(): Boolean = currentTheme.contains("সাদা")
+
     private fun getThemeBackground(): GradientDrawable {
-        return when (currentTheme) {
-            "মদিনা থিম (এমারেল্ড গ্রিন)" -> GradientDrawable(
+        return if (isWhiteTheme()) {
+            GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(Color.parseColor("#0E4D3A"), Color.parseColor("#146B52"), Color.parseColor("#072C21"))
+                intArrayOf(Color.parseColor("#FFFBEB"), Color.parseColor("#F8FAFC"), Color.parseColor("#FFFFFF"))
             )
-            "সুবহ-সাদিক থিম (রয়্যাল গোল্ড)" -> GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(Color.parseColor("#422A0A"), Color.parseColor("#261704"), Color.parseColor("#120A01"))
-            )
-            "লাইলাতুল কদর (নাইট ব্লু)" -> GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(Color.parseColor("#0F2027"), Color.parseColor("#203A43"), Color.parseColor("#2C5364"))
-            )
-            else -> GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(Color.parseColor("#1B2A22"), Color.parseColor("#0B1410"), Color.parseColor("#040706"))
-            )
+        } else {
+            when (currentTheme) {
+                "মদিনা থিম (এমারেল্ড গ্রিন)" -> GradientDrawable(
+                    GradientDrawable.Orientation.TOP_BOTTOM,
+                    intArrayOf(Color.parseColor("#0E4D3A"), Color.parseColor("#146B52"), Color.parseColor("#072C21"))
+                )
+                "সুবহ-সাদিক থিম (রয়্যাল গোল্ড)" -> GradientDrawable(
+                    GradientDrawable.Orientation.TOP_BOTTOM,
+                    intArrayOf(Color.parseColor("#422A0A"), Color.parseColor("#261704"), Color.parseColor("#120A01"))
+                )
+                "লাইলাতুল কদর (নাইট ব্লু)" -> GradientDrawable(
+                    GradientDrawable.Orientation.TOP_BOTTOM,
+                    intArrayOf(Color.parseColor("#0F2027"), Color.parseColor("#203A43"), Color.parseColor("#2C5364"))
+                )
+                else -> GradientDrawable( // কাবা থিম
+                    GradientDrawable.Orientation.TOP_BOTTOM,
+                    intArrayOf(Color.parseColor("#1B2A22"), Color.parseColor("#0B1410"), Color.parseColor("#040706"))
+                )
+            }
         }
     }
 
-    private fun getAccentColor(): Int {
-        return when (currentTheme) {
-            "মদিনা থিম (এমারেল্ড গ্রিন)" -> Color.parseColor("#10B981")
-            "সুবহ-সাদিক থিম (রয়্যাল গোল্ড)" -> Color.parseColor("#F59E0B")
-            "লাইলাতুল কদর (নাইট ব্লু)" -> Color.parseColor("#38BDF8")
-            else -> Color.parseColor("#F5C358")
-        }
-    }
+    private fun getTextColor(): Int = if (isWhiteTheme()) Color.parseColor("#1E293B") else Color.WHITE
+    private fun getSecondaryTextColor(): Int = if (isWhiteTheme()) Color.parseColor("#475569") else Color.parseColor("#D0E2D8")
+    private fun getAccentColor(): Int = if (isWhiteTheme()) Color.parseColor("#D97706") else Color.parseColor("#F5C358")
+    private fun getCardBgColor(): Int = if (isWhiteTheme()) Color.parseColor("#FFFFFF") else Color.parseColor("#1B2E24")
 
     private fun createNavBar(current: String): LinearLayout {
         val nav = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(Color.parseColor("#0D1712"))
+            setBackgroundColor(if (isWhiteTheme()) Color.parseColor("#FFFFFF") else Color.parseColor("#0D1712"))
             setPadding(10, 16, 10, 20)
             gravity = Gravity.CENTER
+            elevation = 16f
         }
 
         val items = listOf(
@@ -190,7 +224,7 @@ class MainActivity : Activity() {
             Triple("জিকির", "zikr_list", "📋"),
             Triple("আমল", "amal", "✅"),
             Triple("কুরআন", "quran", "📖"),
-            Triple("থিম", "settings", "🎨")
+            Triple("সেটিংস", "settings", "⚙️")
         )
 
         val accent = getAccentColor()
@@ -213,7 +247,7 @@ class MainActivity : Activity() {
                 text = item.first
                 textSize = 11f
                 gravity = Gravity.CENTER
-                setTextColor(if (current == item.second) accent else Color.parseColor("#9CB7AA"))
+                setTextColor(if (current == item.second) accent else Color.parseColor("#94A3B8"))
                 setTypeface(null, if (current == item.second) Typeface.BOLD else Typeface.NORMAL)
             }
 
@@ -224,6 +258,59 @@ class MainActivity : Activity() {
         return nav
     }
 
+    // লাইভ টাইমার লজিক (ঘড়ির সাথে সাথে সেকেন্ড কমা)
+    private fun startLiveTimer() {
+        timerRunnable = object : Runnable {
+            override fun run() {
+                updateCountdown()
+                timerHandler.postDelayed(this, 1000)
+            }
+        }
+        timerHandler.post(timerRunnable!!)
+    }
+
+    private fun stopLiveTimer() {
+        timerRunnable?.let { timerHandler.removeCallbacks(it) }
+    }
+
+    private fun updateCountdown() {
+        val now = Calendar.getInstance()
+        val currentMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
+        val currentSeconds = now.get(Calendar.SECOND)
+
+        val offset = districtOffsets[selectedDistrict] ?: 0
+
+        // ওয়াক্তের সময়সূচী (মিনিটে)
+        val fojrEnd = 5 * 60 + 43 + offset
+        val ishraqEnd = 6 * 60 + 30 + offset
+        val chashtEnd = 11 * 60 + 45 + offset
+        val zohrEnd = 16 * 60 + 36 + offset
+        val asrEnd = 18 * 60 + 26 + offset
+        val magribEnd = 19 * 60 + 43 + offset
+
+        val (waqtName, targetMin) = when {
+            currentMinutes < fojrEnd -> "ফজর" to fojrEnd
+            currentMinutes < ishraqEnd -> "ইশরাক" to ishraqEnd
+            currentMinutes < chashtEnd -> "চাশত / দুহা" to chashtEnd
+            currentMinutes < zohrEnd -> "যোহর" to zohrEnd
+            currentMinutes < asrEnd -> "আসর" to asrEnd
+            currentMinutes < magribEnd -> "মাগরিব" to magribEnd
+            else -> "এশা" to (24 * 60 + fojrEnd)
+        }
+
+        var diffSec = (targetMin * 60) - (currentMinutes * 60 + currentSeconds)
+        if (diffSec < 0) diffSec += 24 * 3600
+
+        val h = diffSec / 3600
+        val m = (diffSec % 3600) / 60
+        val s = diffSec % 60
+
+        val timeString = String.format("%02d:%02d:%02d", h, m, s)
+        liveWaqtTextView?.text = "$waqtName শেষ হতে বাকি"
+        liveTimerTextView?.text = timeString
+    }
+
+    // ১. হোম স্ক্রিন (ভিডিওর মতো চলমান টাইমার ও লোকেশন প্যানেল)
     private fun showHomeScreen() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -236,84 +323,84 @@ class MainActivity : Activity() {
 
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(32, 36, 32, 32)
+            setPadding(28, 28, 28, 28)
         }
 
         val accent = getAccentColor()
 
-        val iconHeader = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 0, 0, 16)
-        }
-
-        val kabaBadge = TextView(this).apply {
-            text = "🕋"
-            textSize = 36f
-            gravity = Gravity.CENTER
-        }
-
-        val titleBox = LinearLayout(this).apply {
+        // লাইভ টাইমার কার্ড (ভিডিওর হুবহু ডিজাইন)
+        val timerCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            val lp = LinearLayout.LayoutParams(0, -2, 1f)
-            lp.setMargins(14, 0, 14, 0)
-            layoutParams = lp
-        }
-
-        val title = TextView(this).apply {
-            text = "Sabbir's Amol"
-            textSize = 24f
-            setTextColor(accent)
-            setTypeface(null, Typeface.BOLD)
-        }
-
-        val dateText = TextView(this).apply {
-            val banglaDate = SimpleDateFormat("EEEE, dd MMMM yyyy", Locale("bn", "BD")).format(Date())
-            text = "📍 সাতক্ষীরা\n$banglaDate"
-            textSize = 13f
-            setTextColor(Color.parseColor("#D0E2D8"))
-            setPadding(0, 2, 0, 0)
-        }
-        titleBox.addView(title)
-        titleBox.addView(dateText)
-
-        val domeBadge = TextView(this).apply {
-            text = "🕌"
-            textSize = 36f
-            gravity = Gravity.CENTER
-        }
-
-        iconHeader.addView(kabaBadge)
-        iconHeader.addView(titleBox)
-        iconHeader.addView(domeBadge)
-        content.addView(iconHeader)
-
-        val prayerCard = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(28, 24, 28, 24)
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(32, 28, 32, 28)
             val bg = GradientDrawable()
-            bg.setColor(Color.parseColor("#1B2E24"))
-            bg.cornerRadius = 24f
-            bg.setStroke(2, accent)
+            bg.setColor(if (isWhiteTheme()) Color.parseColor("#FFFBEB") else Color.parseColor("#1B2E24"))
+            bg.cornerRadius = 32f
+            bg.setStroke(3, accent)
             background = bg
         }
 
+        liveWaqtTextView = TextView(this).apply {
+            text = "ইশরাক শেষ হতে বাকি"
+            textSize = 17f
+            setTextColor(getTextColor())
+            setTypeface(null, Typeface.BOLD)
+            gravity = Gravity.CENTER
+        }
+
+        liveTimerTextView = TextView(this).apply {
+            text = "০০:০০:০০"
+            textSize = 44f
+            setTextColor(accent)
+            setTypeface(Typeface.MONOSPACE, Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setPadding(0, 8, 0, 12)
+        }
+
+        // লোকেশন চেঞ্জার বাটন
+        val locationBtn = Button(this).apply {
+            text = "📍 $selectedDistrict (পরিবর্তন করুন ▾)"
+            textSize = 13f
+            setBackgroundColor(if (isWhiteTheme()) Color.parseColor("#FEF3C7") else Color.parseColor("#264536"))
+            setTextColor(getTextColor())
+            setOnClickListener { showDistrictDialog() }
+        }
+
+        timerCard.addView(liveWaqtTextView)
+        timerCard.addView(liveTimerTextView)
+        timerCard.addView(locationBtn)
+        content.addView(timerCard)
+
+        // নামাজের ৫ ওয়াক্তের সময়সূচী
+        val prayerCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(24, 20, 24, 20)
+            val bg = GradientDrawable()
+            bg.setColor(getCardBgColor())
+            bg.cornerRadius = 24f
+            bg.setStroke(1, Color.parseColor("#CBD5E1"))
+            background = bg
+            val lp = LinearLayout.LayoutParams(-1, -2)
+            lp.setMargins(0, 20, 0, 0)
+            layoutParams = lp
+        }
+
         val pTitle = TextView(this).apply {
-            text = "আজকের নামাজের সময়সূচী"
-            textSize = 18f
+            text = "আজকের নামাজের সময়সূচী ($selectedDistrict)"
+            textSize = 17f
             setTextColor(accent)
             setTypeface(null, Typeface.BOLD)
-            setPadding(0, 0, 0, 16)
+            setPadding(0, 0, 0, 12)
         }
         prayerCard.addView(pTitle)
 
+        val offset = districtOffsets[selectedDistrict] ?: 0
         val times = listOf(
-            "ফজর" to "০৪:২৫ - ০৫:৪৩ মি.",
-            "যোহর" to "১২:০৮ - ০৪:৩৬ মি.",
-            "আসর" to "০৪:৩৭ - ০৬:২৬ মি.",
-            "মাগরিব (ইফতার)" to "০৬:২৭ - ০৭:৪৩ মি.",
-            "এশা" to "০৭:৪৪ - ০৪:২৪ মি.",
-            "সাহরির শেষ সময়" to "০৪:১৯ মি."
+            "ফজর" to "০৪:${25 + offset} - ০৫:${43 + offset} মি.",
+            "যোহর" to "১২:${8 + offset} - ০৪:${36 + offset} মি.",
+            "আসর" to "০৪:${37 + offset} - ০৬:${26 + offset} মি.",
+            "মাগরিব (ইফতার)" to "০৬:${27 + offset} - ০৭:${43 + offset} মি.",
+            "এশা" to "০৭:${44 + offset} - ০৪:${24 + offset} মি."
         )
 
         for (t in times) {
@@ -323,13 +410,13 @@ class MainActivity : Activity() {
             }
             val name = TextView(this).apply {
                 text = t.first
-                setTextColor(Color.WHITE)
+                setTextColor(getTextColor())
                 textSize = 15f
                 layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
             }
             val time = TextView(this).apply {
                 text = t.second
-                setTextColor(Color.parseColor("#86EFAC"))
+                setTextColor(if (isWhiteTheme()) Color.parseColor("#059669") else Color.parseColor("#86EFAC"))
                 textSize = 15f
                 setTypeface(null, Typeface.BOLD)
             }
@@ -339,37 +426,42 @@ class MainActivity : Activity() {
         }
         content.addView(prayerCard)
 
-        val btnGoTasbih = Button(this).apply {
+        // কুইক তাসবিহ বাটন
+        val btnTasbih = Button(this).apply {
             text = "📿 ডিজিটাল তাসবিহ শুরু করুন"
             setBackgroundColor(accent)
             setTextColor(Color.BLACK)
             textSize = 16f
             setTypeface(null, Typeface.BOLD)
             val lp = LinearLayout.LayoutParams(-1, -2)
-            lp.setMargins(0, 24, 0, 0)
+            lp.setMargins(0, 20, 0, 0)
             layoutParams = lp
             setOnClickListener { openScreen("tasbih") }
         }
-        content.addView(btnGoTasbih)
-
-        val btnGoList = Button(this).apply {
-            text = "📋 জিকির তালিকা ও কাস্টম জিকির যোগ"
-            setBackgroundColor(Color.parseColor("#264536"))
-            setTextColor(Color.WHITE)
-            textSize = 15f
-            val lp = LinearLayout.LayoutParams(-1, -2)
-            lp.setMargins(0, 16, 0, 0)
-            layoutParams = lp
-            setOnClickListener { openScreen("zikr_list") }
-        }
-        content.addView(btnGoList)
+        content.addView(btnTasbih)
 
         scroll.addView(content)
         root.addView(scroll)
         root.addView(createNavBar("home"))
         setContentView(root)
+
+        startLiveTimer()
     }
 
+    // জেলা পরিবর্তনের ডায়ালগ
+    private fun showDistrictDialog() {
+        val districts = districtOffsets.keys.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("আপনার জেলা নির্বাচন করুন")
+            .setItems(districts) { _, which ->
+                selectedDistrict = districts[which]
+                saveAllData()
+                showHomeScreen()
+            }
+            .show()
+    }
+
+    // ২. ফুল স্ক্রিন ডিজিটাল তাসবিহ
     private fun showTasbihScreen() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -421,28 +513,25 @@ class MainActivity : Activity() {
         }
 
         val centerIcon = TextView(this).apply {
-            text = if (currentTheme.contains("মদিনা")) "🕌\n(মদিনা শরীফ)" else "🕋\n(কাবা শরীফ)"
-            textSize = 28f
+            text = "🕋"
+            textSize = 34f
             gravity = Gravity.CENTER
-            setTextColor(accent)
-            setTypeface(null, Typeface.BOLD)
-            setPadding(0, 0, 0, 10)
         }
         fullScreenTap.addView(centerIcon)
 
         val zikrNameText = TextView(this).apply {
             text = zikr.name
             textSize = 22f
-            setTextColor(Color.parseColor("#9AE6B4"))
+            setTextColor(if (isWhiteTheme()) Color.parseColor("#059669") else Color.parseColor("#9AE6B4"))
             gravity = Gravity.CENTER
             setTypeface(null, Typeface.BOLD)
-            setPadding(0, 0, 0, 10)
+            setPadding(0, 6, 0, 10)
         }
 
         val countDisplay = TextView(this).apply {
             text = "${zikr.count}"
-            textSize = 85f
-            setTextColor(Color.WHITE)
+            textSize = 90f
+            setTextColor(getTextColor())
             setTypeface(null, Typeface.BOLD)
             gravity = Gravity.CENTER
         }
@@ -458,7 +547,7 @@ class MainActivity : Activity() {
         val tapGuide = TextView(this).apply {
             text = "👆 স্ক্রিনের যেকোনো জায়গায় ট্যাপ করে গণনা করুন"
             textSize = 13f
-            setTextColor(Color.parseColor("#718096"))
+            setTextColor(getSecondaryTextColor())
             gravity = Gravity.CENTER
         }
 
@@ -478,7 +567,7 @@ class MainActivity : Activity() {
                     triggerVibration(500)
                     AlertDialog.Builder(this)
                         .setTitle("মাশাআল্লাহ!")
-                        .setMessage("${zikr.name} নির্ধারিত টার্গেট (${zikr.target} বার) সফলভাবে পূর্ণ হয়েছে।")
+                        .setMessage("${zikr.name} নির্ধারিত টার্গেট (${zikr.target} বার) পূর্ণ হয়েছে।")
                         .setPositiveButton("আবার শুরু") { _, _ ->
                             zikr.count = 0
                             saveAllData()
@@ -501,7 +590,7 @@ class MainActivity : Activity() {
         val btnToList = Button(this).apply {
             text = "📋 জিকির পরিবর্তন / তালিকা"
             layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
-            setBackgroundColor(Color.parseColor("#264536"))
+            setBackgroundColor(if (isWhiteTheme()) Color.parseColor("#0F766E") else Color.parseColor("#264536"))
             setTextColor(Color.WHITE)
             setOnClickListener { openScreen("zikr_list") }
         }
@@ -512,6 +601,7 @@ class MainActivity : Activity() {
         setContentView(root)
     }
 
+    // ৩. জিকির তালিকা
     private fun showZikrListScreen() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -529,21 +619,14 @@ class MainActivity : Activity() {
 
         val accent = getAccentColor()
 
-        val headerRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 0, 0, 20)
-        }
-
         val title = TextView(this).apply {
             text = "জিকির তালিকা ও কাস্টমাইজেশন"
             textSize = 20f
             setTextColor(accent)
             setTypeface(null, Typeface.BOLD)
-            layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+            setPadding(0, 0, 0, 16)
         }
-        headerRow.addView(title)
-        content.addView(headerRow)
+        content.addView(title)
 
         val btnAddZikr = Button(this).apply {
             text = "➕ নতুন জিকির যোগ করুন (Add Zikr)"
@@ -552,7 +635,7 @@ class MainActivity : Activity() {
             textSize = 15f
             setTypeface(null, Typeface.BOLD)
             val lp = LinearLayout.LayoutParams(-1, -2)
-            lp.setMargins(0, 0, 0, 24)
+            lp.setMargins(0, 0, 0, 20)
             layoutParams = lp
             setOnClickListener { showAddZikrDialog() }
         }
@@ -561,14 +644,14 @@ class MainActivity : Activity() {
         for (item in zikrList) {
             val card = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
-                setPadding(24, 20, 24, 20)
+                setPadding(20, 16, 20, 16)
                 val bg = GradientDrawable()
-                bg.setColor(if (item.id == activeZikrId) Color.parseColor("#264536") else Color.parseColor("#1B2E24"))
+                bg.setColor(getCardBgColor())
                 bg.cornerRadius = 20f
-                bg.setStroke(if (item.id == activeZikrId) 3 else 1, if (item.id == activeZikrId) accent else Color.parseColor("#2F503F"))
+                bg.setStroke(if (item.id == activeZikrId) 3 else 1, if (item.id == activeZikrId) accent else Color.parseColor("#CBD5E1"))
                 background = bg
                 val lp = LinearLayout.LayoutParams(-1, -2)
-                lp.setMargins(0, 0, 0, 16)
+                lp.setMargins(0, 0, 0, 14)
                 layoutParams = lp
             }
 
@@ -584,19 +667,19 @@ class MainActivity : Activity() {
                 setTypeface(null, Typeface.BOLD)
                 gravity = Gravity.CENTER
                 val bg = GradientDrawable()
-                bg.setColor(Color.parseColor("#3B6852"))
+                bg.setColor(Color.parseColor("#0F766E"))
                 bg.cornerRadius = 40f
                 background = bg
-                setPadding(24, 12, 24, 12)
+                setPadding(20, 10, 20, 10)
             }
 
             val nameView = TextView(this).apply {
                 text = item.name
-                textSize = 17f
-                setTextColor(Color.WHITE)
+                textSize = 16f
+                setTextColor(getTextColor())
                 setTypeface(null, Typeface.BOLD)
                 val lp = LinearLayout.LayoutParams(0, -2, 1f)
-                lp.setMargins(20, 0, 10, 0)
+                lp.setMargins(16, 0, 10, 0)
                 layoutParams = lp
             }
 
@@ -607,8 +690,8 @@ class MainActivity : Activity() {
             val targetText = TextView(this).apply {
                 text = "টার্গেট: ${item.target} বার (গোণা হয়েছে: ${item.count} বার)"
                 textSize = 13f
-                setTextColor(Color.parseColor("#A0BDB0"))
-                setPadding(0, 10, 0, 14)
+                setTextColor(getSecondaryTextColor())
+                setPadding(0, 8, 0, 12)
             }
             card.addView(targetText)
 
@@ -629,28 +712,20 @@ class MainActivity : Activity() {
                 }
             }
 
-            val btnEdit = Button(this).apply {
-                text = "✏️ এডিট"
-                textSize = 12f
-                val lp = LinearLayout.LayoutParams(-2, -2)
-                lp.setMargins(12, 0, 12, 0)
-                layoutParams = lp
-                setOnClickListener { showEditZikrDialog(item) }
-            }
-
             val btnDelete = Button(this).apply {
                 text = "Delete"
                 textSize = 12f
-                setBackgroundColor(Color.parseColor("#991B1B"))
+                val lp = LinearLayout.LayoutParams(-2, -2)
+                lp.setMargins(0, 0, 10, 0)
+                layoutParams = lp
+                setBackgroundColor(Color.parseColor("#DC2626"))
                 setTextColor(Color.WHITE)
                 setOnClickListener {
                     if (zikrList.size <= 1) {
                         Toast.makeText(this@MainActivity, "কমপক্ষে একটি জিকির থাকতে হবে!", Toast.LENGTH_SHORT).show()
                     } else {
                         zikrList.remove(item)
-                        if (activeZikrId == item.id) {
-                            activeZikrId = zikrList.first().id
-                        }
+                        if (activeZikrId == item.id) activeZikrId = zikrList.first().id
                         saveAllData()
                         showZikrListScreen()
                     }
@@ -658,7 +733,6 @@ class MainActivity : Activity() {
             }
 
             actionsRow.addView(btnDelete)
-            actionsRow.addView(btnEdit)
             actionsRow.addView(btnContinue)
             card.addView(actionsRow)
 
@@ -677,9 +751,7 @@ class MainActivity : Activity() {
             setPadding(40, 20, 40, 20)
         }
 
-        val nameInput = EditText(this).apply {
-            hint = "জিকিরের নাম লিখুন"
-        }
+        val nameInput = EditText(this).apply { hint = "জিকিরের নাম লিখুন" }
         val targetInput = EditText(this).apply {
             hint = "টার্গেট সংখ্যা (যেমন: ৩৩)"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
@@ -696,12 +768,7 @@ class MainActivity : Activity() {
                 val name = nameInput.text.toString().trim()
                 val target = targetInput.text.toString().toIntOrNull() ?: 33
                 if (name.isNotEmpty()) {
-                    val newItem = ZikrItem(
-                        id = UUID.randomUUID().toString(),
-                        name = name,
-                        count = 0,
-                        target = if (target > 0) target else 33
-                    )
+                    val newItem = ZikrItem(UUID.randomUUID().toString(), name, 0, if (target > 0) target else 33)
                     zikrList.add(newItem)
                     activeZikrId = newItem.id
                     saveAllData()
@@ -712,40 +779,7 @@ class MainActivity : Activity() {
             .show()
     }
 
-    private fun showEditZikrDialog(item: ZikrItem) {
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(40, 20, 40, 20)
-        }
-
-        val nameInput = EditText(this).apply {
-            setText(item.name)
-        }
-        val targetInput = EditText(this).apply {
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            setText("${item.target}")
-        }
-
-        layout.addView(nameInput)
-        layout.addView(targetInput)
-
-        AlertDialog.Builder(this)
-            .setTitle("জিকির এডিট করুন")
-            .setView(layout)
-            .setPositiveButton("আপডেট") { _, _ ->
-                val n = nameInput.text.toString().trim()
-                val t = targetInput.text.toString().toIntOrNull() ?: item.target
-                if (n.isNotEmpty()) {
-                    item.name = n
-                    item.target = if (t > 0) t else 33
-                    saveAllData()
-                    showZikrListScreen()
-                }
-            }
-            .setNegativeButton("বাতিল", null)
-            .show()
-    }
-
+    // ৪. দৈনিক আমল স্ক্রিন
     private fun showAmalScreen() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -787,7 +821,7 @@ class MainActivity : Activity() {
             val cb = CheckBox(this).apply {
                 text = am
                 textSize = 16f
-                setTextColor(Color.WHITE)
+                setTextColor(getTextColor())
                 isChecked = prefs.getBoolean("${dayKey}_$idx", false)
                 setOnCheckedChangeListener { _, isChecked ->
                     prefs.edit().putBoolean("${dayKey}_$idx", isChecked).apply()
@@ -802,6 +836,7 @@ class MainActivity : Activity() {
         setContentView(root)
     }
 
+    // ৫. কুরআন ও ইসলামিক রিসোর্স
     private fun showQuranScreen() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -836,7 +871,7 @@ class MainActivity : Activity() {
             val btn = Button(this).apply {
                 text = item.first
                 setTextColor(Color.WHITE)
-                setBackgroundColor(Color.parseColor("#22382C"))
+                setBackgroundColor(Color.parseColor("#0F766E"))
                 textSize = 15f
                 val lp = LinearLayout.LayoutParams(-1, -2)
                 lp.setMargins(0, 12, 0, 12)
@@ -855,38 +890,79 @@ class MainActivity : Activity() {
         setContentView(root)
     }
 
+    // ৬. জিমেইল ব্যাকআপ ও থিম সেটিংস
     private fun showSettingsScreen() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = getThemeBackground()
         }
 
+        val scroll = ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(-1, 0, 1f)
+        }
+
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(32, 32, 32, 32)
-            layoutParams = LinearLayout.LayoutParams(-1, 0, 1f)
         }
 
         val accent = getAccentColor()
 
         val h = TextView(this).apply {
-            text = "৪ কালার থিম সেটিংস"
+            text = "সেটিংস ও ব্যাকআপ"
             textSize = 22f
             setTextColor(accent)
             setTypeface(null, Typeface.BOLD)
-            setPadding(0, 0, 0, 24)
+            setPadding(0, 0, 0, 20)
         }
         content.addView(h)
 
-        val themeInfo = TextView(this).apply {
-            text = "পছন্দের থিম নির্বাচন করুন (বর্তমান: $currentTheme):"
-            textSize = 15f
+        // জিমেইল / ক্লাউড ব্যাকআপ সেকশন
+        val backupCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(20, 16, 20, 16)
+            val bg = GradientDrawable()
+            bg.setColor(getCardBgColor())
+            bg.cornerRadius = 20f
+            bg.setStroke(1, Color.parseColor("#CBD5E1"))
+            background = bg
+        }
+
+        val bTitle = TextView(this).apply {
+            text = "📧 জিমেইল লগইন / ব্যাকআপ (মাল্টি ডিভাইস)"
+            textSize = 16f
+            setTextColor(getTextColor())
+            setTypeface(null, Typeface.BOLD)
+        }
+        val bDesc = TextView(this).apply {
+            text = if (userEmail.isEmpty()) "কোনো জিমেইল যুক্ত নেই। অন্য ফোনে চালাতে আপনার জিমেইল লিখুন।" else "সংযুক্ত জিমেইল: $userEmail"
+            textSize = 13f
+            setTextColor(getSecondaryTextColor())
+            setPadding(0, 4, 0, 12)
+        }
+        val btnLogin = Button(this).apply {
+            text = if (userEmail.isEmpty()) "জিমেইল যুক্ত করুন" else "জিমেইল পরিবর্তন / সিঙ্ক"
+            setBackgroundColor(Color.parseColor("#2563EB"))
             setTextColor(Color.WHITE)
-            setPadding(0, 0, 0, 16)
+            setOnClickListener { showLoginDialog() }
+        }
+
+        backupCard.addView(bTitle)
+        backupCard.addView(bDesc)
+        backupCard.addView(btnLogin)
+        content.addView(backupCard)
+
+        // থিম নির্বাচন
+        val themeInfo = TextView(this).apply {
+            text = "\n🎨 থিম নির্বাচন করুন (বর্তমান: $currentTheme):"
+            textSize = 15f
+            setTextColor(getTextColor())
+            setPadding(0, 16, 0, 12)
         }
         content.addView(themeInfo)
 
         val themes = listOf(
+            "⚪ সাদা থিম (লাইট)" to "#F1F5F9",
             "🕋 কাবা থিম (ডার্ক গোল্ড)" to "#1B2A22",
             "🕌 মদিনা থিম (এমারেল্ড গ্রিন)" to "#0E4D3A",
             "🌅 সুবহ-সাদিক থিম (রয়্যাল গোল্ড)" to "#422A0A",
@@ -897,10 +973,10 @@ class MainActivity : Activity() {
             val btn = Button(this).apply {
                 text = th.first
                 setBackgroundColor(Color.parseColor(th.second))
-                setTextColor(Color.WHITE)
+                setTextColor(if (th.first.contains("সাদা")) Color.BLACK else Color.WHITE)
                 textSize = 15f
                 val lp = LinearLayout.LayoutParams(-1, -2)
-                lp.setMargins(0, 12, 0, 12)
+                lp.setMargins(0, 8, 0, 8)
                 layoutParams = lp
                 setOnClickListener {
                     currentTheme = th.first
@@ -911,8 +987,30 @@ class MainActivity : Activity() {
             content.addView(btn)
         }
 
-        root.addView(content)
+        scroll.addView(content)
+        root.addView(scroll)
         root.addView(createNavBar("settings"))
         setContentView(root)
+    }
+
+    private fun showLoginDialog() {
+        val input = EditText(this).apply {
+            hint = "আপনার Gmail লিখুন (e.g. sabbir@gmail.com)"
+            setText(userEmail)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("জিমেইল ক্লাউড অ্যাকাউন্ট")
+            .setView(input)
+            .setPositiveButton("লগইন / সিঙ্ক") { _, _ ->
+                val em = input.text.toString().trim()
+                if (em.isNotEmpty()) {
+                    userEmail = em
+                    saveAllData()
+                    Toast.makeText(this, "সফলভাবে জিমেইল সংযুক্ত হয়েছে!", Toast.LENGTH_SHORT).show()
+                    showSettingsScreen()
+                }
+            }
+            .setNegativeButton("বাতিল", null)
+            .show()
     }
 }
