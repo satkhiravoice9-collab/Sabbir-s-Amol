@@ -19,31 +19,8 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
-    - name: Setup Android SDK Licenses
+    - name: Setup Android Project Files
       run: |
-        yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-
-    - name: Install Standalone Gradle 8.2
-      run: |
-        wget -q https://services.gradle.org/distributions/gradle-8.2-bin.zip
-        sudo unzip -q gradle-8.2-bin.zip -d /opt
-        echo "/opt/gradle-8.2/bin" >> $GITHUB_PATH
-
-    - name: Clean Old Conflicts & Build Fresh Project
-      run: |
-        # আগের সব কনফ্লিক্টিং ফাইল ক্লিন করা
-        rm -rf app settings.gradle build.gradle settings.gradle.kts build.gradle.kts
-
-        # ফোল্ডার তৈরি
-        mkdir -p app/src/main/java/com/sabbir/amol
-        mkdir -p app/src/main/res/values
-        mkdir -p app/src/main/assets
-
-        # assets ফোল্ডারে index.html কপি (রিপোজিটরিতে থাকলে) অথবা ডিফল্ট রাখা
-        if [ -f "index.html" ]; then
-          cp index.html app/src/main/assets/index.html
-        fi
-
         # 1. settings.gradle
         cat << 'EOF' > settings.gradle
         pluginManagement {
@@ -73,6 +50,7 @@ jobs:
             }
             dependencies {
                 classpath 'com.android.tools.build:gradle:8.2.2'
+                classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.22'
             }
         }
         allprojects {
@@ -84,8 +62,12 @@ jobs:
         EOF
 
         # 3. app/build.gradle
+        mkdir -p app
         cat << 'EOF' > app/build.gradle
-        apply plugin: 'com.android.application'
+        plugins {
+            id 'com.android.application'
+            id 'org.jetbrains.kotlin.android'
+        }
 
         android {
             namespace 'com.sabbir.amol'
@@ -109,15 +91,22 @@ jobs:
                 sourceCompatibility JavaVersion.VERSION_17
                 targetCompatibility JavaVersion.VERSION_17
             }
+
+            kotlinOptions {
+                jvmTarget = '17'
+            }
         }
 
         dependencies {
+            implementation 'androidx.core:core-ktx:1.12.0'
             implementation 'androidx.appcompat:appcompat:1.6.1'
             implementation 'com.google.android.material:material:1.11.0'
+            implementation 'androidx.activity:activity-ktx:1.8.2'
         }
         EOF
 
         # 4. Themes & Strings
+        mkdir -p app/src/main/res/values
         cat << 'EOF' > app/src/main/res/values/themes.xml
         <resources>
             <style name="Theme.SabbirsAmol" parent="Theme.AppCompat.Light.NoActionBar" />
@@ -131,6 +120,7 @@ jobs:
         EOF
 
         # 5. AndroidManifest.xml
+        mkdir -p app/src/main
         cat << 'EOF' > app/src/main/AndroidManifest.xml
         <?xml version="1.0" encoding="utf-8"?>
         <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -152,57 +142,26 @@ jobs:
         </manifest>
         EOF
 
-        # 6. MainActivity.java
-        cat << 'EOF' > app/src/main/java/com/sabbir/amol/MainActivity.java
-        package com.sabbir.amol;
-
-        import android.annotation.SuppressLint;
-        import android.os.Bundle;
-        import android.webkit.WebChromeClient;
-        import android.webkit.WebSettings;
-        import android.webkit.WebView;
-        import android.webkit.WebViewClient;
-        import androidx.appcompat.app.AppCompatActivity;
-
-        public class MainActivity extends AppCompatActivity {
-            private WebView webView;
-
-            @SuppressLint("SetJavaScriptEnabled")
-            @Override
-            protected void onCreate(Bundle savedInstanceState) {
-                super.onCreate(savedInstanceState);
-                webView = new WebView(this);
-                setContentView(webView);
-
-                WebSettings settings = webView.getSettings();
-                settings.setJavaScriptEnabled(true);
-                settings.setDomStorageEnabled(true);
-                settings.setDatabaseEnabled(true);
-                settings.setAllowFileAccess(true);
-                settings.setAllowContentAccess(true);
-                settings.setLoadWithOverviewMode(true);
-                settings.useWideViewPort = true
-
-                webView.setWebViewClient(new WebViewClient());
-                webView.setWebChromeClient(new WebChromeClient());
-                webView.loadUrl("file:///android_asset/index.html");
-            }
-
-            @Override
-            public void onBackPressed() {
-                if (webView != null && webView.canGoBack()) {
-                    webView.goBack();
-                } else {
-                    super.onBackPressed();
-                }
-            }
-        }
+        # 6. Setup Gradle Wrapper
+        mkdir -p gradle/wrapper
+        wget -q https://raw.githubusercontent.com/gradle/gradle/v8.2.0/gradle/wrapper/gradle-wrapper.jar -O gradle/wrapper/gradle-wrapper.jar
+        cat << 'EOF' > gradle/wrapper/gradle-wrapper.properties
+        distributionBase=GRADLE_USER_HOME
+        distributionPath=wrapper/dists
+        distributionUrl=https\://services.gradle.org/distributions/gradle-8.2-bin.zip
+        networkTimeout=10000
+        validateDistributionUrl=true
+        zipStoreBase=GRADLE_USER_HOME
+        zipStorePath=wrapper/dists
         EOF
 
-    - name: Build Debug APK
-      run: gradle assembleDebug --no-daemon --stacktrace
+        wget -q https://raw.githubusercontent.com/gradle/gradle/v8.2.0/gradlew -O gradlew
+        chmod +x gradlew
 
-    - name: Upload APK Artifact
+    - name: Build Debug APK
+      run: ./gradlew assembleDebug --no-daemon
+
+    - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: Sabbirs-Amol-APK
