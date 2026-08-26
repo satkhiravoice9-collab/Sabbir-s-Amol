@@ -19,7 +19,6 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.view.Gravity
 import android.widget.*
-import androidx.core.app.NotificationCompat
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -64,11 +63,17 @@ class PrayerAlarmReceiver : BroadcastReceiver() {
         val alarmSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
             ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
 
-        val notification = NotificationCompat.Builder(context, channelId)
+        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(context, channelId)
+        } else {
+            @Suppress("DEPRECATION")
+            Notification.Builder(context)
+        }
+
+        val notification = builder
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle(title)
             .setContentText(message)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setSound(alarmSound)
             .setAutoCancel(true)
             .build()
@@ -261,6 +266,10 @@ class MainActivity : Activity() {
                 }
             } catch (e: Exception) { initDefaultZikr() }
         } else { initDefaultZikr() }
+
+        if (activeZikrId.isEmpty() || zikrList.none { it.id == activeZikrId }) {
+            activeZikrId = zikrList.firstOrNull()?.id ?: "1"
+        }
 
         val savedNotes = prefs.getString("note_items_json", null)
         noteList.clear()
@@ -637,7 +646,6 @@ class MainActivity : Activity() {
         val ishraqEnd = 6 * 60 + 30 + offset
         val chashtEnd = 11 * 60 + 45 + offset
         val middayHaramEnd = 12 * 60 + 8 + offset
-        val zohrStart = 12 * 60 + 8 + offset
         
         val asrStartHour = if (selectedMadhab == "হানাফী") 16 else 15
         val asrStartMin = if (selectedMadhab == "হানাফী") 37 else 52
@@ -645,7 +653,6 @@ class MainActivity : Activity() {
 
         val asrEnd = 18 * 60 + 10 + offset
         val sunsetHaramEnd = 18 * 60 + 27 + offset
-        val magribStart = 18 * 60 + 27 + offset
         val magribEnd = 19 * 60 + 44 + offset
 
         val (waqtName, targetMin) = when {
@@ -1406,11 +1413,11 @@ class MainActivity : Activity() {
         content.addView(h)
 
         val items = listOf(
-            "সূরা আল-ফাতিহা (৩ বার)" to "بِسْمِ اللهِ الرَّحْمَنِ الرَّحِيمِ (1) الْحَمْدُ لِلَّهِ رَبِّ الْعَلَمِينَ (٢) الرَّحْمَنِ الرَّحِيمِ (۳) مَلِكِ يَوْمِ الدِّينِ (4) إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ (٥) اِهْدِنَا الصِّرَاطَ الْمُسْتَقِيمَ (6) صِرَاطَ الَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ الْمَغْضُوبِ عَلَيْهِمْ وَلَا الضَّالِّينَ (۷)[span_0](start_span)"[span_0](end_span),
-            "আয়াতুল কুরসি (৩ বার)" to "اللهُ لَا إِلَهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ ، لَا تَأْخُذُهُ سِنَةٌ وَلَا نَوْমٌ لَهُ مَا فِي السَّمَاتِ وَمَا فِي الْأَرْضِ مَنْ ذَا الَّذِي يَشْفَعُ عِنْدَةً إِلَّا بِإِذْنِهِ يَعْلَمُ مَا بَيْنَ أَيْদِيهِمْ وَمَا خَلْفَهُمْ وَلَا يُحِيطُونَ بِشَيْءٍ مِّنْ عِلْمِهِ إِلَّا بِمَا شَاءَ وَسِعَ كُرْسِيُّهُ السَّمَوَاتِ وَالْأَرْضَ وَلَا يَئُودُهُ حِفْظُهُمَا وَهُوَ الْعَلِيُّ الْعَظِيمُ[span_1](start_span)"[span_1](end_span),
+            "সূরা আল-ফাতিহা (৩ বার)" to "بِسْمِ اللهِ الرَّحْمَنِ الرَّحِيمِ (1) الْحَمْدُ لِلَّهِ رَبِّ الْعَلَمِينَ (٢) الرَّحْمَنِ الرَّحِيمِ (۳) مَلِكِ يَوْمِ الدِّينِ (4) إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ (٥) اِهْدِنَا الصِّরَاطَ الْمُسْتَقِيمَ (6) صِرَاطَ الَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ الْمَغْضُوبِ عَلَيْهِمْ وَلَا الضَّالِّينَ (۷)[span_0](start_span)"[span_0](end_span),
+            "আয়াতুল কুরসি (৩ বার)" to "اللهُ لَا إِلَهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ ، لَا تَأْخُذُهُ سِنَةٌ وَلَا نَوْمٌ لَهُ مَا فِي السَّمَاتِ وَمَا فِي الْأَرْضِ مَنْ ذَا الَّذِي يَشْفَعُ عِنْدَةً إِلَّا بِإِذْنِهِ يَعْلَمُ مَا بَيْنَ أَيْদِيهِمْ وَمَا خَلْفَهُمْ وَلَا يُحِيطُونَ بِشَيْءٍ مِّنْ عِلْمِهِ إِلَّا بِمَا شَاءَ وَسِعَ كُرْسِيُّهُ السَّمَوَاتِ وَالْأَرْضَ وَلَا يَئُودُهُ حِفْظُهُمَا وَهُوَ الْعَلِيُّ الْعَظِيمُ[span_1](start_span)"[span_1](end_span),
             "৪ কুল ও বিশেষ দু'আসমূহ" to "সূরা আল-কাফিরূন, সূরা আল-ইখলাস, সূরা আল-ফালাক, সূরা আন-নাস (প্রত্যেকটি ৩ বার করে)[span_2](start_span)"[span_2](end_span),
             "সকাল ও সন্ধ্যার তাসবিহ" to "সুবহানাল্লাহ (১০ বার), আলহামদুলিল্লাহ (১০ বার), আল্লাহু আকবার (১০ বার)\n\nলা ইলাহা ইল্লাল্লাহু ওয়াহদাহু লা শারীকা লাহু... (১০০ বার)[span_3](start_span)"[span_3](end_span),
-            "সায়্যিদুল ইস্তিগফার (১ বার)" to "اللَّهُمَّ أَنْتَ رَبِّي لَا إِلَهَ إِلَّا أَنْتَ، خَلَقْتَنِي وَأَنَا عَبْدُكَ ، وَأَنَا عَلَى عَهْدِكَ وَوَعْدِكَ مَا اسْتَطَعْتُ ، أَعُوذُ بِكَ مِنْ شَرِّ مَا صَنَعْتُ ، أَبُوءُ لَكَ بِنِعْمَتِكَ عَلَيَّ، وَأَبُوءُ لَكَ بِذَنْبِي فَاغْفِرْ লِي، فَإِنَّهُ لَا يَغْفِرُ الذُّنُوبَ إِلَّا أَنْتَ[span_4](start_span)"[span_4](end_span),
+            "সায়্যিদুল ইস্তিগফার (১ বার)" to "اللَّهُمَّ أَنْتَ رَبِّي لَا إِلَهَ إِلَّا أَنْتَ، خَلَقْتَنِي وَأَنَا عَبْدُكَ ، وَأَنَا عَلَى عَهْدِكَ وَوَعْدِكَ مَا اسْتَطَعْتُ ، أَعُوذُ بِكَ مِنْ شَرِّ مَا صَنَعْتُ ، أَبُوءُ لَكَ بِنِعْمَتِكَ عَلَيَّ، وَأَبُوءُ لَكَ بِذَنْبِي فَاغْফِرْ লِي، فَإِنَّهُ لَا يَغْفِرُ الذُّنُوبَ إِلَّا أَنْتَ[span_4](start_span)"[span_4](end_span),
             "ঘুমানোর পূর্বের আমল" to "১. ওযু করে ঘুমানো।\n২. বিছানা ঝেড়ে শোয়া।\n৩. আয়াতুল কুরসি পড়া।\n৪. ৩ কুল পড়ে শরীরে ফু দেওয়া।\n৫. ঘুমের দোয়া: (اللَّهُمَّ بِاسْمِكَ أَمُوتُ وَأَحْيَا)\n৬. ঘুম থেকে উঠে দোয়া পড়া।[span_5](start_span)"[span_5](end_span)
         )
 
@@ -1448,8 +1455,8 @@ class MainActivity : Activity() {
         content.addView(h)
 
         val manzilAyats = listOf(
-            "১. সূরা আল-ইনশিকাক (১-২৫)" to "بِسْمِ اللهِ الرَّحْمَنِ الرَّحِيمِ\nإِذَا السَّمَاءُ انْশَقَّتْ ، وَأَذِنَتْ لِرَبِّهَا وَحُقَّتْ ، وَإِذَا الْأَرْضُ مُدَّتْ وَأَلْقَتْ مَا فِيهَا وَتَخَلَّتْ ، وَأَذِنَتْ لِرَبِّهَا وَحُقَّتْ ، يَأَيُّهَا الْإِنْسَانُ إِنَّكَ كَادِحٌ إِلَى رَبِّكَ كَدْحًا فَمُلَقِيهِ...[span_6](start_span)"[span_6](end_span),
-            "২. সূরা আল-ফাতিহা ও আল-বাকারাহ (১-৫)" to "بِسْمِ اللهِ الرَّحْمَنِ الرَّحِيمِ\nالْحَمْدُ لِلَّهِ رَبِّ الْعَلَمِينَ ، الرَّحْمَنِ الرَّحِيمِ ، مَلِكِ יَوْمِ الدِّينِ...\n\nالم ، ذَلِكَ الْكِتَبُ لَا رَيْبَ فِيهِ هُدًى لِلْمُتَّقِينَ...[span_7](start_span)"[span_7](end_span),
+            "১. সূরা আল-ইনশিকাক (১-২৫)" to "بِسْمِ اللهِ الرَّحْمَنِ الرَّحِيمِ\nإِذَا السَّمَاءُ انْশَقَّتْ ، وَأَذِنَتْ لِرَبِّهَا وَحُقَّتْ ، وَإِذَا الْأَرْضُ مُদَّتْ وَأَلْقَتْ مَا فِيهَا وَتَخَلَّتْ ، وَأَذِنَتْ لِرَبِّهَا وَحُقَّتْ ، يَأَيُّهَا الْإِنْسَانُ إِنَّكَ كَادِحٌ إِلَى رَبِّكَ كَدْحًا فَمُلَقِيهِ...[span_6](start_span)"[span_6](end_span),
+            "২. সূরা আল-ফাতিহা ও আল-বাকারাহ (১-৫)" to "بِسْمِ اللهِ الرَّحْمَنِ الرَّحِيمِ\nالْحَمْدُ لِلَّهِ رَبِّ الْعَلَمِينَ ، الرَّحْمَنِ الرَّحِيمِ ، مَلِكِ יَوْمِ الدِّينِ...\n\nالم ، ذَلِكَ الْكِتَبُ لَا رَيْبَ فِيهِ هُদًى لِلْمُتَّقِينَ...[span_7](start_span)"[span_7](end_span),
             "৩. আয়াতুল কুরসি ও আমানার রাসুল" to "اللهُ لَا إِلَهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ...\n\nآمَنَ الرَّسُولُ بِمَا أُنْزِلَ إِلَيْهِ مِنْ رَّبِّهِ وَالْمُؤْمِنُونَ...[span_8](start_span)"[span_8](end_span),
             "৪. সূরা আলে ইমরান, আল-আ'রাফ ও আল-ইসরা" to "شَهِدَ اللَّهُ أَنَّهُ لَا إِلَهَ إِلَّا هُوَ وَالْمَلَئِكَةُ...\n\nإِنَّ رَبَّكُمُ اللَّهُ الَّذِي خَلَقَ السَّمَوَاتِ وَالْأَرْضَ...",
             "৫. সূরা আস-সাফফাত, আল-হাশর ও আল-জিন" to "وَالصَّافَّاتِ صَفًّا ، فَالزَّاجِرَاتِ زَجْرًا...\n\nلَوْ أَنْزَلْنَا هَذَا الْقُرْآنَ عَلَى جَبَلٍ لَرَأَيْتَهُ خَاشِعًا...\n\nقُلْ أُوحِيَ إِلَيَّ أَنَّهُ اسْتَمَعَ نَفَرٌ مِنَ الْجِنِّ..."
@@ -1655,7 +1662,8 @@ class MainActivity : Activity() {
             typeface = Typeface.SERIF; setBackgroundColor(Color.parseColor("#2563EB")); setTextColor(Color.WHITE)
             setOnClickListener { promptGoogleAccountPicker() }
         }
-        backupCard.addView(bTitle); backupCard.addView(bDesc); backupCard.addView(btnLogin); content.addView(backupCard)
+        backupCard.addView(bTitle); backupCard.addView(bDesc); backupCard.addView(btnLogin)
+        content.addView(backupCard)
 
         val themeInfo = TextView(this).apply { text = "\n🎨 অ্যাপ থিম নির্বাচন করুন:"; textSize = 15f; typeface = Typeface.SERIF; setTextColor(getTextColor()); setPadding(0, 10, 0, 10) }
         content.addView(themeInfo)
