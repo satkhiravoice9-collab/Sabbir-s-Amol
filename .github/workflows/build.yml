@@ -22,17 +22,18 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
 
-    - name: Build with Gradle
+    - name: Setup Project and Build Configuration
       run: |
-        chmod +x ./gradlew || true
-        mkdir -p ~/.android
-        keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US" || true
-        
+        mkdir -p app/src/main
+        mkdir -p app/src/main/res/values
+
+        # ১. settings.gradle
         cat << 'EOF' > settings.gradle
         rootProject.name = "SabbirsAmol"
         include ':app'
         EOF
 
+        # ২. রুট build.gradle
         cat << 'EOF' > build.gradle
         buildscript {
             repositories {
@@ -40,8 +41,8 @@ jobs:
                 mavenCentral()
             }
             dependencies {
-                classpath 'com.android.tools.build:gradle:8.2.2'
-                classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.22'
+                classpath 'com.android.tools.build:gradle:8.1.4'
+                classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.0'
             }
         }
         allprojects {
@@ -52,17 +53,16 @@ jobs:
         }
         EOF
 
+        # ৩. gradle.properties
         cat << 'EOF' > gradle.properties
         org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
         android.useAndroidX=true
-        kotlin.code.style=official
         EOF
 
+        # ৪. app/build.gradle
         cat << 'EOF' > app/build.gradle
-        plugins {
-            id 'com.android.application'
-            id 'org.jetbrains.kotlin.android'
-        }
+        apply plugin: 'com.android.application'
+        apply plugin: 'kotlin-android'
 
         android {
             namespace 'com.sabbirsamol.app'
@@ -98,10 +98,40 @@ jobs:
         }
         EOF
 
+        # ৫. app/src/main/AndroidManifest.xml
+        cat << 'EOF' > app/src/main/AndroidManifest.xml
+        <?xml version="1.0" encoding="utf-8"?>
+        <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+            <uses-permission android:name="android.permission.VIBRATE" />
+            <application
+                android:allowBackup="true"
+                android:icon="@android:drawable/sym_def_app_icon"
+                android:label="Sabbir's Amol"
+                android:supportsRtl="true"
+                android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+                <activity
+                    android:name=".MainActivity"
+                    android:exported="true">
+                    <intent-filter>
+                        <action android:name="android.intent.action.MAIN" />
+                        <category android:name="android.intent.category.LAUNCHER" />
+                    </intent-filter>
+                </activity>
+            </application>
+        </manifest>
+        EOF
+
+        # ৬. app/src/main/res/values/strings.xml
+        cat << 'EOF' > app/src/main/res/values/strings.xml
+        <resources>
+            <string name="app_name">Sabbir\'s Amol</string>
+        </resources>
+        EOF
+
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
       with:
-        gradle-version: '8.2'
+        gradle-version: '8.1.1'
         cache-disabled: true
 
     - name: Build Debug APK
@@ -112,3 +142,4 @@ jobs:
       with:
         name: Sabbirs-Tasbih-APK
         path: app/build/outputs/apk/debug/*.apk
+        
