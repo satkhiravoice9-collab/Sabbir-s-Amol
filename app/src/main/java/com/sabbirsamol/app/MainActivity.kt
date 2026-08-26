@@ -576,38 +576,4 @@ class MainActivity : Activity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = getThemeBackground()
-        }
-
-        val scroll = ScrollView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(-1, 0, 1f)
-        }
-
-        val content = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(28, 28, 28, 28)
-        }
-
-        val accent = getAccentColor()
-
-        val headerRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 0, 0, 20)
-        }
-
-        val title = TextView(this).apply {
-            text = "জিকির তালিকা ও কাস্টমাইজেশন"
-            textSize = 20f
-            setTextColor(accent)
-            setTypeface(null, Typeface.BOLD)
-            layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
-        }
-        headerRow.addView(title)
-        content.addView(headerRow)
-
-        val btnAddZikr = Button(this).apply {
-            text = "➕ নতুন জিকির যোগ করুন (Add Zikr)"
-            setBackgroundColor(accent)
-            setTextColor(Color.BLACK)
-            textSize = 15f
-            setTypeface(null,
+     
