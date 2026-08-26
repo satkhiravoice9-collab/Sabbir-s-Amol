@@ -52,6 +52,7 @@ jobs:
         cat << 'EOF' > gradle.properties
         org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
         android.useAndroidX=true
+        kotlin.code.style=official
         EOF
 
         cat << 'EOF' > app/build.gradle
@@ -69,6 +70,16 @@ jobs:
                 versionCode 1
                 versionName "1.0"
             }
+
+            compileOptions {
+                sourceCompatibility JavaVersion.VERSION_17
+                targetCompatibility JavaVersion.VERSION_17
+            }
+
+            kotlinOptions {
+                jvmTarget = '17'
+            }
+
             buildTypes {
                 release {
                     minifyEnabled false
@@ -104,7 +115,6 @@ jobs:
       uses: gradle/actions/setup-gradle@v3
       with:
         gradle-version: '8.2'
-        cache-read-only: false
         cache-disabled: true
 
     - name: Build Debug APK
