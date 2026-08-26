@@ -1,1 +1,121 @@
-# Sabbir-s-Amol
+name: Build APK
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Generate Android Configuration Files
+      run: |
+        mkdir -p app/src/main/res/values
+        
+        cat << 'EOF' > settings.gradle.kts
+        pluginManagement {
+            repositories {
+                google()
+                mavenCentral()
+                gradlePluginPortal()
+            }
+        }
+        dependencyResolutionManagement {
+            repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+            repositories {
+                google()
+                mavenCentral()
+            }
+        }
+        rootProject.name = "SabbirsAmol"
+        include(":app")
+        EOF
+
+        cat << 'EOF' > build.gradle.kts
+        plugins {
+            id("com.android.application") version "8.4.2" apply false
+            id("org.jetbrains.kotlin.android") version "1.9.24" apply false
+        }
+        EOF
+
+        cat << 'EOF' > gradle.properties
+        org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+        android.useAndroidX=true
+        kotlin.code.style=official
+        EOF
+
+        cat << 'EOF' > app/build.gradle.kts
+        plugins {
+            id("com.android.application")
+            id("org.jetbrains.kotlin.android")
+        }
+        android {
+            namespace = "com.sabbirsamol.app"
+            compileSdk = 34
+            defaultConfig {
+                applicationId = "com.sabbirsamol.app"
+                minSdk = 24
+                targetSdk = 34
+                versionCode = 1
+                versionName = "1.0"
+            }
+        }
+        dependencies {
+            implementation("androidx.core:core-ktx:1.13.1")
+        }
+        EOF
+
+        cat << 'EOF' > app/src/main/AndroidManifest.xml
+        <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+            <application
+                android:theme="@style/AppTheme"
+                android:label="Sabbir's Amol"
+                android:allowBackup="true">
+                <activity
+                    android:name=".MainActivity"
+                    android:screenOrientation="portrait"
+                    android:exported="true">
+                    <intent-filter>
+                        <action android:name="android.intent.action.MAIN"/>
+                        <category android:name="android.intent.category.LAUNCHER"/>
+                    </intent-filter>
+                </activity>
+            </application>
+        </manifest>
+        EOF
+
+        cat << 'EOF' > app/src/main/res/values/styles.xml
+        <resources>
+            <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+                <item name="android:fontFamily">sans</item>
+                <item name="android:colorAccent">#16734F</item>
+                <item name="android:navigationBarColor">#FFFFFF</item>
+                <item name="android:statusBarColor">#0C4D37</item>
+                <item name="android:windowLightStatusBar">false</item>
+            </style>
+        </resources>
+        EOF
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
+      with:
+        gradle-version: '8.6'
+
+    - name: Build Debug APK
+      run: gradle assembleDebug --no-daemon --stacktrace
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: Sabbirs-Tasbih-APK
+        path: app/build/outputs/apk/debug/*.apk
