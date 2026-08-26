@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Repository
+    - name: Checkout Code
       uses: actions/checkout@v4
 
     - name: Set up JDK 17
@@ -19,9 +19,9 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
-    - name: Setup Android Project Files
+    - name: Generate Android Project & Gradle Wrapper
       run: |
-        # root settings.gradle.kts
+        # 1. settings.gradle.kts তৈরি
         cat << 'EOF' > settings.gradle.kts
         pluginManagement {
             repositories {
@@ -41,7 +41,7 @@ jobs:
         include(":app")
         EOF
 
-        # root build.gradle.kts
+        # 2. root build.gradle.kts তৈরি
         cat << 'EOF' > build.gradle.kts
         plugins {
             id("com.android.application") version "8.2.2" apply false
@@ -49,7 +49,7 @@ jobs:
         }
         EOF
 
-        # app/build.gradle.kts
+        # 3. app/build.gradle.kts তৈরি
         mkdir -p app
         cat << 'EOF' > app/build.gradle.kts
         plugins {
@@ -91,7 +91,7 @@ jobs:
         }
         EOF
 
-        # AndroidManifest.xml
+        # 4. AndroidManifest.xml তৈরি
         mkdir -p app/src/main
         cat << 'EOF' > app/src/main/AndroidManifest.xml
         <?xml version="1.0" encoding="utf-8"?>
@@ -114,13 +114,12 @@ jobs:
         </manifest>
         EOF
 
-    - name: Setup Gradle 8.2
-      uses: gradle/actions/setup-gradle@v3
-      with:
-        gradle-version: '8.2'
+        # 5. অফিশিয়াল Gradle 8.2 Wrapper তৈরি
+        gradle wrapper --gradle-version 8.2
+        chmod +x gradlew
 
-    - name: Build Debug APK
-      run: gradle assembleDebug
+    - name: Build Debug APK with Gradle Wrapper
+      run: ./gradlew assembleDebug --no-daemon --no-build-cache
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
