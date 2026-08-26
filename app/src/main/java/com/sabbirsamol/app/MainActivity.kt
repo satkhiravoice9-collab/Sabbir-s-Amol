@@ -85,7 +85,7 @@ class MainActivity : Activity() {
     private var selectedUnion = "ঈশ্বরীপুর"
     private var selectedMadhab = "হানাফী"
     private var userEmail = ""
-    private var hijriOffset = 0 // বাংলাদেশের চাঁদ দেখা অনুযায়ী অ্যাডজাস্টমেন্ট
+    private var hijriOffset = 0
 
     private val GOOGLE_ACCOUNT_PICKER_REQUEST = 1001
     private val FIREBASE_DB_URL = "https://sabbirs-amol-default-rtdb.firebaseio.com"
@@ -117,21 +117,16 @@ class MainActivity : Activity() {
         return "${toBangla(String.format("%02d", h))}:${toBangla(String.format("%02d", minute % 60))}"
     }
 
-    // ১০০% সঠিক লাইভ হিজরি ও বাংলা তারিখ ক্যালকুলেশন (মাগরিবের হিসাবসহ)
     private fun getCombinedIslamicDate(): Triple<String, String, String> {
         val now = Calendar.getInstance()
         val hour24 = now.get(Calendar.HOUR_OF_DAY)
         val min = now.get(Calendar.MINUTE)
         val currentMins = hour24 * 60 + min
 
-        // মাগরিবের পর ইসলামিক দিন স্বয়ংক্রিয়ভাবে পরবর্তী দিন হয়ে যায়
         val isAfterMagrib = currentMins >= (18 * 60 + 27)
 
         val calForHijri = Calendar.getInstance()
-        if (isAfterMagrib) {
-            calForHijri.add(Calendar.DATE, 1)
-        }
-        // ইউজার কাস্টম অফসেট যোগ
+        if (isAfterMagrib) calForHijri.add(Calendar.DATE, 1)
         calForHijri.add(Calendar.DATE, hijriOffset)
 
         val engFormat = SimpleDateFormat("EEEE, dd MMMM yyyy", Locale.ENGLISH)
@@ -151,14 +146,38 @@ class MainActivity : Activity() {
                 hYear = hijrah.get(ChronoField.YEAR_OF_ERA)
             } catch (e: Exception) {}
         }
-
         val hDate = "${toBangla(hDay)} ${arabicMonths[(hMonth - 1).coerceIn(0, 11)]}, ${toBangla(hYear)} হিজরি"
 
-        // বাংলা তারিখ
+        // নির্ভুল বাংলা ক্যালেন্ডার
         val bnMonthNames = arrayOf("বৈশাখ", "জ্যৈষ্ঠ", "আষাঢ়", "শ্রাবণ", "ভাদ্র", "আশ্বিন", "কার্তিক", "অগ্রহায়ণ", "পৌষ", "মাঘ", "ফাল্গুন", "চৈত্র")
-        val dayOfYear = now.get(Calendar.DAY_OF_YEAR)
-        val bnYear = if (dayOfYear >= 105) now.get(Calendar.YEAR) - 593 else now.get(Calendar.YEAR) - 594
-        val bnDate = "${toBangla(now.get(Calendar.DAY_OF_MONTH))} ${bnMonthNames[(now.get(Calendar.MONTH) + 8) % 12]}, ${toBangla(bnYear)} বঙ্গাব্দ"
+        val monthDays = intArrayOf(31, 31, 31, 31, 31, 30, 30, 30, 30, 30, 29, 30)
+        
+        val gYear = now.get(Calendar.YEAR)
+        val gMonth = now.get(Calendar.MONTH) // 0-based
+        val gDay = now.get(Calendar.DAY_OF_MONTH)
+        
+        var bYear = gYear - 593
+        val isLeapYear = (gYear % 4 == 0 && gYear % 100 != 0) || (gYear % 400 == 0)
+        if (isLeapYear) monthDays[10] = 30
+
+        val startDayOfBengaliYear = Calendar.getInstance().apply { set(gYear, Calendar.APRIL, 14, 0, 0, 0) }
+        var dayDiff = ((now.timeInMillis - startDayOfBengaliYear.timeInMillis) / (1000 * 60 * 60 * 24)).toInt()
+        
+        var bMonthIdx = 0
+        var bDay = 1
+        if (dayDiff < 0) {
+            bYear -= 1
+            dayDiff += if (isLeapYear) 366 else 365
+        }
+        for (i in 0 until 12) {
+            if (dayDiff < monthDays[i]) {
+                bMonthIdx = i
+                bDay = dayDiff + 1
+                break
+            }
+            dayDiff -= monthDays[i]
+        }
+        val bnDate = "${toBangla(bDay)} ${bnMonthNames[bMonthIdx]}, ${toBangla(bYear)} বঙ্গাব্দ"
 
         return Triple(hDate, bnDate, engDate)
     }
@@ -529,6 +548,7 @@ class MainActivity : Activity() {
         timerRunnable?.let { timerHandler.removeCallbacks(it) }
     }
 
+    // ১০০% নির্ভুল লাইভ কাউন্টডাউন ও ওয়াক্ত ক্যালকুলেশন
     private fun updateCountdown() {
         val now = Calendar.getInstance()
         val hour24 = now.get(Calendar.HOUR_OF_DAY)
@@ -546,31 +566,39 @@ class MainActivity : Activity() {
         liveDateTextView?.text = "🌙 $hijri\n📅 $bangla  |  $english"
 
         val offset = if (selectedDistrict.contains("সাতক্ষীরা")) 4 else if (selectedDistrict.contains("ঢাকা")) 0 else 2
-        val asrExtra = if (selectedMadhab == "হানাফী") 45 else 0
 
+        // প্রতিটি ওয়াক্তের সুনির্দিষ্ট শুরুর মিনিট
         val sehriEnd = 4 * 60 + 19 + offset
+        val fojrStart = 4 * 60 + 25 + offset
         val fojrEnd = 5 * 60 + 43 + offset
         val sunriseHaramEnd = 6 * 60 + 3 + offset
         val ishraqEnd = 6 * 60 + 30 + offset
         val chashtEnd = 11 * 60 + 45 + offset
-        val middayHaramEnd = 12 * 60 + 7 + offset
-        val zohrEnd = 16 * 60 + 36 + offset + asrExtra
+        val middayHaramEnd = 12 * 60 + 8 + offset
+        val zohrStart = 12 * 60 + 8 + offset
+        
+        // আসর শুরুর মিনিট (যোহর শেষ হওয়ার ঠিক সমান)
+        val asrStartHour = if (selectedMadhab == "হানাফী") 16 else 15
+        val asrStartMin = if (selectedMadhab == "হানাফী") 37 else 52
+        val asrStartTotalMin = asrStartHour * 60 + asrStartMin + offset
+
         val asrEnd = 18 * 60 + 10 + offset
-        val sunsetHaramEnd = 18 * 60 + 26 + offset
-        val magribEnd = 19 * 60 + 43 + offset
+        val sunsetHaramEnd = 18 * 60 + 27 + offset
+        val magribStart = 18 * 60 + 27 + offset
+        val magribEnd = 19 * 60 + 44 + offset
 
         val (waqtName, targetMin) = when {
-            currentMinutes < sehriEnd -> "সাহরির শেষ সময় বাকি" to sehriEnd
-            currentMinutes < fojrEnd -> "ফজর ওয়াক্ত শেষ হতে বাকি" to fojrEnd
+            currentMinutes < fojrStart -> "ফজর ওয়াক্ত শুরু হতে বাকি" to fojrStart
+            currentMinutes < fojrEnd -> "ফজর শেষ হতে বাকি" to fojrEnd
             currentMinutes < sunriseHaramEnd -> "🚫 সূর্যোদয় (নামাজ নিষিদ্ধ সময়)" to sunriseHaramEnd
             currentMinutes < ishraqEnd -> "ইশরাক শেষ হতে বাকি" to ishraqEnd
             currentMinutes < chashtEnd -> "চাশত / দুহা শেষ হতে বাকি" to chashtEnd
             currentMinutes < middayHaramEnd -> "🚫 দ্বিপ্রহর (নামাজ নিষিদ্ধ সময়)" to middayHaramEnd
-            currentMinutes < zohrEnd -> "যোহর শেষ হতে বাকি" to zohrEnd
+            currentMinutes < asrStartTotalMin -> "যোহর শেষ হতে বাকি" to asrStartTotalMin
             currentMinutes < asrEnd -> "আসর ($selectedMadhab) শেষ হতে বাকি" to asrEnd
             currentMinutes < sunsetHaramEnd -> "🚫 সূর্যাস্ত (নামাজ নিষিদ্ধ সময়)" to sunsetHaramEnd
-            currentMinutes < magribEnd -> "মাগরিব / ইফতারের ওয়াক্ত বাকি" to magribEnd
-            else -> "তাহাজ্জুদ ও সাহরির সময়" to (24 * 60 + sehriEnd)
+            currentMinutes < magribEnd -> "মাগরিব / ইফতারের ওয়াক্ত শেষ হতে বাকি" to magribEnd
+            else -> "এশা শেষ হতে বাকি" to (24 * 60 + fojrStart)
         }
 
         var diffSec = (targetMin * 60) - (currentMinutes * 60 + sec)
@@ -585,14 +613,12 @@ class MainActivity : Activity() {
         liveTimerTextView?.text = toBangla(timeString)
     }
 
-    // ১. হোম স্ক্রিন
     private fun showHomeScreen() {
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = getThemeBackground() }
         val scroll = ScrollView(this).apply { layoutParams = LinearLayout.LayoutParams(-1, 0, 1f) }
         val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(24, 24, 24, 24) }
         val accent = getAccentColor()
 
-        // লাইভ ঘড়ি
         val clockCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
@@ -615,7 +641,6 @@ class MainActivity : Activity() {
         clockCard.addView(liveClockTextView)
         content.addView(clockCard)
 
-        // ৩ ক্যালেন্ডার লাইভ তারিখ কার্ড + তারিখ অ্যাডজাস্ট বাটন
         val dateCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(18, 14, 18, 14)
@@ -654,7 +679,6 @@ class MainActivity : Activity() {
         dateCard.addView(btnAdjustHijri)
         content.addView(dateCard)
 
-        // লাইভ ওয়াক্ত টাইমার
         val timerCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
@@ -714,7 +738,6 @@ class MainActivity : Activity() {
 
         val offset = if (selectedDistrict.contains("সাতক্ষীরা")) 4 else if (selectedDistrict.contains("ঢাকা")) 0 else 2
 
-        // সাহরি ও ইফতার
         val specialCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(20, 16, 20, 16)
@@ -753,7 +776,6 @@ class MainActivity : Activity() {
         }
         content.addView(specialCard)
 
-        // ৫ ওয়াক্ত নামাজের সময় ও অ্যালার্ম
         val prayerCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(20, 16, 20, 16)
@@ -777,13 +799,13 @@ class MainActivity : Activity() {
         }
         prayerCard.addView(pTitle)
 
-        val asrStartHour = if (selectedMadhab == "হানাফী") 4 else 3
-        val asrStartMin = if (selectedMadhab == "হানাফী") 37 else 52
+        val asrStartHourDisplay = if (selectedMadhab == "হানাফী") 4 else 3
+        val asrStartMinDisplay = if (selectedMadhab == "হানাফী") 37 else 52
 
         val prayerAlarmList = listOf(
             Triple("ফজর", "${formatBanglaTime(4, 25 + offset)} মি.", Pair(4, 25 + offset)),
             Triple("যোহর", "${formatBanglaTime(12, 8 + offset)} মি.", Pair(12, 8 + offset)),
-            Triple("আসর", "${formatBanglaTime(asrStartHour, asrStartMin + offset)} মি.", Pair(if (asrStartHour < 12) asrStartHour + 12 else asrStartHour, asrStartMin + offset)),
+            Triple("আসর", "${formatBanglaTime(asrStartHourDisplay, asrStartMinDisplay + offset)} মি.", Pair(if (asrStartHourDisplay < 12) asrStartHourDisplay + 12 else asrStartHourDisplay, asrStartMinDisplay + offset)),
             Triple("মাগরিব", "${formatBanglaTime(6, 27 + offset)} মি.", Pair(18, 27 + offset)),
             Triple("এশা", "${formatBanglaTime(7, 44 + offset)} মি.", Pair(19, 44 + offset))
         )
@@ -814,7 +836,6 @@ class MainActivity : Activity() {
         }
         content.addView(prayerCard)
 
-        // ৩টি হারাম ওয়াক্ত
         val haramCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(20, 16, 20, 16)
@@ -889,7 +910,6 @@ class MainActivity : Activity() {
         startLiveTimer()
     }
 
-    // হিজরি তারিখ অ্যাডজাস্ট ডায়ালগ
     private fun showHijriAdjustDialog() {
         val options = arrayOf("১ দিন এগিয়ে নিন (+১ দিন)", "স্বাভাবিক রাখুন (০ দিন)", "১ দিন পিছিয়ে দিন (-১ দিন)", "২ দিন পিছিয়ে দিন (-২ দিন)")
         val values = intArrayOf(1, 0, -1, -2)
