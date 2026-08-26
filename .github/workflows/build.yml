@@ -19,9 +19,9 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
-    - name: Generate Android Project & Gradle Wrapper
+    - name: Generate Complete Android Project Files
       run: |
-        # 1. settings.gradle.kts তৈরি
+        # ১. settings.gradle.kts
         cat << 'EOF' > settings.gradle.kts
         pluginManagement {
             repositories {
@@ -41,7 +41,7 @@ jobs:
         include(":app")
         EOF
 
-        # 2. root build.gradle.kts তৈরি
+        # ২. root build.gradle.kts
         cat << 'EOF' > build.gradle.kts
         plugins {
             id("com.android.application") version "8.2.2" apply false
@@ -49,7 +49,7 @@ jobs:
         }
         EOF
 
-        # 3. app/build.gradle.kts তৈরি
+        # ৩. app/build.gradle.kts
         mkdir -p app
         cat << 'EOF' > app/build.gradle.kts
         plugins {
@@ -91,7 +91,25 @@ jobs:
         }
         EOF
 
-        # 4. AndroidManifest.xml তৈরি
+        # ৪. প্রয়োজনীয় রিসোর্স ও থিম ফাইল তৈরি (AAPT2 এরর প্রতিরোধের জন্য)
+        mkdir -p app/src/main/res/values
+        cat << 'EOF' > app/src/main/res/values/themes.xml
+        <resources>
+            <style name="Theme.SabbirsAmol" parent="Theme.AppCompat.Light.NoActionBar">
+                <item name="colorPrimary">#d97706</item>
+                <item name="colorPrimaryDark">#b45309</item>
+                <item name="colorAccent">#d97706</item>
+            </style>
+        </resources>
+        EOF
+
+        cat << 'EOF' > app/src/main/res/values/strings.xml
+        <resources>
+            <string name="app_name">Sabbir\'s Amol</string>
+        </resources>
+        EOF
+
+        # ৫. AndroidManifest.xml তৈরি
         mkdir -p app/src/main
         cat << 'EOF' > app/src/main/AndroidManifest.xml
         <?xml version="1.0" encoding="utf-8"?>
@@ -99,9 +117,9 @@ jobs:
             <uses-permission android:name="android.permission.INTERNET" />
             <application
                 android:allowBackup="true"
-                android:label="Sabbir's Amol"
+                android:label="@string/app_name"
                 android:supportsRtl="true"
-                android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+                android:theme="@style/Theme.SabbirsAmol">
                 <activity
                     android:name=".MainActivity"
                     android:exported="true">
@@ -114,12 +132,12 @@ jobs:
         </manifest>
         EOF
 
-        # 5. অফিশিয়াল Gradle 8.2 Wrapper তৈরি
-        gradle wrapper --gradle-version 8.2
+        # ৬. Gradle 8.2 Wrapper তৈরি
+        gradle wrapper --gradle-version 8.2 --distribution-type bin
         chmod +x gradlew
 
-    - name: Build Debug APK with Gradle Wrapper
-      run: ./gradlew assembleDebug --no-daemon --no-build-cache
+    - name: Build Debug APK
+      run: ./gradlew assembleDebug --stacktrace --no-daemon
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
