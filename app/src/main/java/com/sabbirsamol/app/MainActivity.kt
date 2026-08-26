@@ -1022,15 +1022,20 @@ class MainActivity : Activity() {
             .show()
     }
 
+    // ২. ব্ল্যাঙ্ক ও মুক্ত ডিজিটাল তাসবিহ স্ক্রিন (উপরে টার্গেট পরিবর্তন আইকন সহ)
     private fun showTasbihScreen() {
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = getThemeBackground() }
         val accent = getAccentColor()
 
-        val topBar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(20, 16, 20, 8); gravity = Gravity.CENTER_VERTICAL }
+        val topBar = LinearLayout(this).apply { 
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(16, 16, 16, 8)
+            gravity = Gravity.CENTER_VERTICAL 
+        }
         
         val btnTitleEdit = Button(this).apply {
             text = "✏️ $freeCounterTitle"
-            textSize = 13.5f
+            textSize = 13f
             typeface = Typeface.SERIF
             setTextColor(getTextColor())
             setBackgroundColor(if (isWhiteTheme()) Color.parseColor("#F1F5F9") else Color.parseColor("#1E293B"))
@@ -1039,12 +1044,24 @@ class MainActivity : Activity() {
             setOnClickListener { showEditFreeCounterTitleDialog() }
         }
 
+        // 🎯 উপরে টার্গেট পরিবর্তনের আলাদা আইকন বাটন
+        val btnTargetEdit = Button(this).apply {
+            text = "🎯 ${toBangla(freeCounterTarget)}"
+            textSize = 12f
+            typeface = Typeface.SERIF
+            setTextColor(Color.WHITE)
+            setBackgroundColor(if (isWhiteTheme()) Color.parseColor("#D97706") else Color.parseColor("#B45309"))
+            val lp = LinearLayout.LayoutParams(-2, -2)
+            lp.setMargins(6, 0, 6, 0)
+            layoutParams = lp
+            setOnClickListener { showEditFreeCounterTargetDialog() }
+        }
+
         val btnReset = Button(this).apply {
             text = "রিসেট (০)"
             textSize = 12f
             typeface = Typeface.SERIF
             val lp = LinearLayout.LayoutParams(-2, -2)
-            lp.setMargins(8, 0, 0, 0)
             layoutParams = lp
             setOnClickListener {
                 AlertDialog.Builder(this@MainActivity)
@@ -1058,17 +1075,19 @@ class MainActivity : Activity() {
                     .setNegativeButton("না", null).show()
             }
         }
+
         topBar.addView(btnTitleEdit)
+        topBar.addView(btnTargetEdit)
         topBar.addView(btnReset)
         root.addView(topBar)
 
         val fullScreenTap = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; layoutParams = LinearLayout.LayoutParams(-1, 0, 1f); gravity = Gravity.CENTER; setPadding(32, 10, 32, 10) }
-        val centerIcon = TextView(this).apply { text = "📿"; textSize = 38f; gravity = Gravity.CENTER }
+        val centerIcon = TextView(this).apply { text = "📿"; textSize = 40f; gravity = Gravity.CENTER }
         fullScreenTap.addView(centerIcon)
 
         val countDisplay = TextView(this).apply { 
             text = toBangla(freeCounterCount)
-            textSize = 96f
+            textSize = 100f
             typeface = Typeface.SERIF
             setTextColor(getTextColor())
             setTypeface(Typeface.SERIF, Typeface.BOLD)
@@ -1076,13 +1095,13 @@ class MainActivity : Activity() {
         }
 
         val targetInfo = TextView(this).apply { 
-            text = "টার্গেট: ${toBangla(freeCounterTarget)} বার (পরিবর্তন করতে ট্যাপ করুন)"
-            textSize = 14f
+            text = "টার্গেট: ${toBangla(freeCounterTarget)} বার"
+            textSize = 15f
             typeface = Typeface.SERIF
             setTextColor(accent)
+            setTypeface(Typeface.SERIF, Typeface.BOLD)
             gravity = Gravity.CENTER
             setPadding(0, 4, 0, 18)
-            setOnClickListener { showEditFreeCounterTargetDialog() }
         }
 
         val tapGuide = TextView(this).apply { 
@@ -1167,7 +1186,7 @@ class MainActivity : Activity() {
             typeface = Typeface.SERIF
         }
         AlertDialog.Builder(this)
-            .setTitle("কাউন্টার টার্গেট নির্ধারণ")
+            .setTitle("🎯 টার্গেট নির্ধারণ করুন")
             .setView(input)
             .setPositiveButton("সেট করুন") { _, _ ->
                 val num = input.text.toString().toIntOrNull() ?: 100
@@ -1181,6 +1200,7 @@ class MainActivity : Activity() {
             .show()
     }
 
+    // ৩. জিকির তালিকা স্ক্রিন
     private fun showZikrListScreen() {
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = getThemeBackground() }
         val scroll = ScrollView(this).apply { layoutParams = LinearLayout.LayoutParams(-1, 0, 1f) }
@@ -1432,10 +1452,10 @@ class MainActivity : Activity() {
         content.addView(h)
 
         val items = listOf(
-            "সূরা আল-ফাতিহা (৩ বার)" to "بِسْمِ اللهِ الرَّحْمَنِ الرَّحِيمِ (1) الْحَمْدُ لِلَّهِ رَبِّ الْعَلَمِينَ (٢) الرَّحْمَنِ الرَّحِيمِ (۳) مَلِكِ يَوْمِ الدِّينِ (4) إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ (٥) اِهْدِنَا الصِّرَاطَ الْمُسْتَقِيمَ (6) صِرَاطَ الَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ الْمَغْضُوبِ عَلَيْهِمْ وَلَا الضَّالِّينَ (۷)",
+            "সূরা আল-ফাতিহা (৩ বার)" to "بِسْمِ اللهِ الرَّحْمَنِ الرَّحِيمِ (1) الْحَمْدُ لِلَّهِ رَبِّ الْعَلَمِينَ (٢) الرَّحْمَنِ الرَّحِيمِ (۳) مَلِكِ يَوْمِ الدِّينِ (4) إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ (٥) اِهْدِنَا الصِّরَاطَ الْمُسْتَقِيمَ (6) صِرَاطَ الَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ الْمَغْضُوبِ عَلَيْهِمْ وَلَا الضَّالِّينَ (۷)",
             "আয়াতুল কুরসি (৩ বার)" to "اللهُ لَا إِلَهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ ، لَا تَأْخُذُهُ سِنَةٌ وَلَا نَوْمٌ لَهُ مَا فِي السَّمَاتِ وَمَا فِي الْأَرْضِ مَنْ ذَا الَّذِي يَشْفَعُ عِنْدَةً إِلَّا بِإِذْنِهِ يَعْلَمُ مَا بَيْنَ أَيْدِيهِمْ وَمَا خَلْفَهُمْ وَلَا يُحِيطُونَ بِشَيْءٍ مِّنْ عِلْمِهِ إِلَّا بِمَا شَاءَ وَسِعَ كُرْسِيُّهُ السَّمَوَاتِ وَالْأَرْضَ وَلَا يَئُودُهُ حِفْظُهُمَا وَهُوَ الْعَلِيُّ الْعَظِيمُ",
             "৪ কুল ও বিশেষ দু'আসমূহ" to "সূরা আল-কাফিরূন, সূরা আল-ইখলাস, সূরা আল-ফালাক, সূরা আন-নাস (প্রত্যেকটি ৩ বার করে)",
-            "সকাল ও সন্ধ্যার তাসবিহ" to "سُبْحَانَ اللَّهِ ، وَالْحَمْدُ لِلَّهِ ، وَلَا إِلَهَ إِلَّا اللَّهُ ، وَاللَّهُ أَكْبَرُ (১০ বার)\n\nلَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ ، وَلَهُ الْحَمْدُ (১০০ বার)",
+            "সকাল ও সন্ধ্যার তাসবিহ" to "সুবহানাল্লাহ (১০ বার), আলহামদুলিল্লাহ (১০ বার), আল্লাহু আকবার (১০ বার)\n\nলা ইলাহা ইল্লাল্লাহু ওয়াহদাহু লা শারীকা লাহু... (১০০ বার)",
             "সায়্যিদুল ইস্তিগফার (১ বার)" to "اللَّهُمَّ أَنْتَ رَبِّي لَا إِلَهَ إِلَّا أَنْتَ، خَلَقْتَنِي وَأَنَا عَبْدُكَ ، وَأَنَا عَلَى عَهْدِكَ وَوَعْدِكَ مَا اسْتَطَعْتُ ، أَعُوذُ بِكَ مِنْ شَرِّ مَا صَنَعْتُ ، أَبُوءُ لَكَ بِنِعْمَتِكَ عَلَيَّ، وَأَبُوءُ لَكَ بِذَنْبِي فَاغْفِرْ লِي، فَإِنَّهُ لَا يَغْفِرُ الذُّنُوبَ إِلَّا أَنْتَ",
             "ঘুমানোর পূর্বের আমল" to "১. ওযু করে ঘুমানো।\n২. বিছানা ঝেড়ে শোয়া।\n৩. আয়াতুল কুরসি পড়া।\n৪. ৩ কুল পড়ে শরীরে ফু দেওয়া।\n৫. ঘুমের দোয়া: (اللَّهُمَّ بِاسْمِكَ أَمُوتُ وَأَحْيَا)\n৬. ঘুম থেকে উঠে দোয়া পড়া।"
         )
