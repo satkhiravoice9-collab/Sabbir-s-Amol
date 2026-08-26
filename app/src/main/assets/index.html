@@ -1,1 +1,317 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>সাব্বির'স আমল</title>
+    <style>
+        :root {
+            --primary: #065f46;
+            --primary-dark: #064e3b;
+            --accent: #d97706;
+            --bg: #f3f4f6;
+            --card-bg: #ffffff;
+            --text: #1f2937;
+            --text-light: #6b7280;
+        }
 
+        .dark-mode {
+            --primary: #10b981;
+            --primary-dark: #059669;
+            --accent: #f59e0b;
+            --bg: #111827;
+            --card-bg: #1f2937;
+            --text: #f9fafb;
+            --text-light: #9ca3af;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            padding-bottom: 30px;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+            color: white;
+            padding: 24px 16px;
+            text-align: center;
+            border-bottom-left-radius: 24px;
+            border-bottom-right-radius: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        .theme-btn {
+            position: absolute;
+            right: 16px;
+            top: 16px;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .time-box {
+            font-size: 28px;
+            font-weight: bold;
+            margin: 8px 0;
+        }
+
+        .date-box {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .container {
+            padding: 16px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin: 20px 0 10px;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 14px;
+            padding: 14px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+            margin-bottom: 12px;
+        }
+
+        .prayer-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .prayer-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 12px;
+            background: var(--bg);
+            border-radius: 10px;
+            font-size: 14px;
+        }
+
+        .prayer-name {
+            font-weight: bold;
+        }
+
+        .prayer-time {
+            color: var(--accent);
+            font-weight: bold;
+        }
+
+        .accordion {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            margin-bottom: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+        }
+
+        .accordion-header {
+            padding: 14px 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 4px solid var(--primary);
+        }
+
+        .accordion-content {
+            display: none;
+            padding: 14px 16px;
+            border-top: 1px solid var(--bg);
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--text-light);
+        }
+
+        .arabic {
+            font-size: 18px;
+            text-align: right;
+            margin-bottom: 8px;
+            color: var(--text);
+            line-height: 1.8;
+            font-weight: 500;
+        }
+
+        .bangla-meaning {
+            margin-top: 6px;
+            color: var(--text);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <button class="theme-btn" onclick="toggleDarkMode()" id="themeBtn">ডার্ক মোড</button>
+        <h1>সাব্বির'স আমল</h1>
+        <div class="time-box" id="liveTime">০০:০০:০০</div>
+        <div class="date-box" id="liveDate">তারিখ লোড হচ্ছে...</div>
+    </header>
+
+    <div class="container">
+        
+        <!-- নামাজের ওয়াক্ত -->
+        <div class="section-title">🕌 হানাফী নামাজের ওয়াক্ত (আনুমানিক)</div>
+        <div class="card prayer-grid">
+            <div class="prayer-item"><span class="prayer-name">ফজর</span><span class="prayer-time">০৫:০৫ AM</span></div>
+            <div class="prayer-item"><span class="prayer-name">সূর্যোদয়</span><span class="prayer-time">০৬:২৫ AM</span></div>
+            <div class="prayer-item"><span class="prayer-name">যোহর</span><span class="prayer-time">১২:১৫ PM</span></div>
+            <div class="prayer-item"><span class="prayer-name">আসর (হানাফী)</span><span class="prayer-time">০৪:৩৫ PM</span></div>
+            <div class="prayer-item"><span class="prayer-name">মাগরিব</span><span class="prayer-time">০৬:০৫ PM</span></div>
+            <div class="prayer-item"><span class="prayer-name">ইশা</span><span class="prayer-time">০৭:২৫ PM</span></div>
+        </div>
+
+        <!-- নির্বাচিত ৬টি সূরা -->
+        <div class="section-title">📖 নির্বাচিত ৬টি সূরা</div>
+        
+        <div class="accordion">
+            <div class="accordion-header" onclick="toggleAccordion(this)">১. সূরা আল-ফাতিহা <span>▼</span></div>
+            <div class="accordion-content">
+                <div class="arabic">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ ۝ الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ ۝ الرَّحْمَٰنِ الرَّحِيمِ ۝ مَالِكِ يَوْمِ الدِّينِ ۝ إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ ۝ اهْدِنَا الصِّرَاطَ الْمُسْتَقِيمَ ۝ صِرَاطَ الَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ الْمَغْضُوبِ عَلَيْهِمْ وَلَا الضَّالِّينَ ۝</div>
+                <div class="bangla-meaning"><strong>অনুবাদ:</strong> পরম করুণাময় অতি দয়ালু আল্লাহর নামে। সমস্ত প্রশংসা সারা জাহানের প্রতিপালক আল্লাহর জন্য। যিনি পরম করুণাময় ও অতি দয়ালু। বিচার দিবসের মালিক। আমরা কেবল তোমারই ইবাদত করি এবং কেবল তোমারই কাছে সাহায্য চাই। আমাদের সরল ও সঠিক পথ দেখাও।</div>
+            </div>
+        </div>
+
+        <div class="accordion">
+            <div class="accordion-header" onclick="toggleAccordion(this)">২. সূরা আল-ইখলাস <span>▼</span></div>
+            <div class="accordion-content">
+                <div class="arabic">قُلْ هُوَ اللَّهُ أَحَدٌ ۝ اللَّهُ الصَّمَدُ ۝ لَمْ يَلِدْ وَلَمْ يُولَدْ ۝ وَلَمْ يَكُن لَّهُ كُفُوًا أَحَدٌ ۝</div>
+                <div class="bangla-meaning"><strong>অনুবাদ:</strong> বলুন, তিনিই আল্লাহ, এক-একক। আল্লাহ কারো মুখাপেক্ষী নন, সবাই তাঁর মুখাপেক্ষী। তিনি কাউকে জন্ম দেননি এবং তাঁকেও জন্ম দেওয়া হয়নি। আর তাঁর সমকক্ষ কেউই নেই।</div>
+            </div>
+        </div>
+
+        <div class="accordion">
+            <div class="accordion-header" onclick="toggleAccordion(this)">৩. সূরা আল-ফালাক <span>▼</span></div>
+            <div class="accordion-content">
+                <div class="arabic">قُلْ أَعُوذُ بِرَبِّ الْفَلَقِ ۝ مِن شَرِّ مَا خَلَقَ ۝ وَمِن شَرِّ غَاسِقٍ إِذَا وَقَبَ ۝ وَمِن شَرِّ النَّفَّاثَاتِ فِي الْعُقَدِ ۝ وَمِن شَرِّ حَاسِدٍ إِذَا حَسَدَ ۝</div>
+                <div class="bangla-meaning"><strong>অনুবাদ:</strong> বলুন, আমি আশ্রয় প্রার্থনা করছি প্রভাতের প্রতিপালকের কাছে। তিনি যা সৃষ্টি করেছেন তার অনিষ্ট থেকে। অন্ধকার রাতের অনিষ্ট থেকে যখন তা সমাগত হয়। এবং গিরায় ফুঁকদানকারিনীদের অনিষ্ট থেকে। এবং হিংসুকের অনিষ্ট থেকে যখন সে হিংসা করে।</div>
+            </div>
+        </div>
+
+        <div class="accordion">
+            <div class="accordion-header" onclick="toggleAccordion(this)">৪. সূরা আন-নাস <span>▼</span></div>
+            <div class="accordion-content">
+                <div class="arabic">قُلْ أَعُوذُ بِرَبِّ النَّاسِ ۝ مَلِكِ النَّاسِ ۝ إِلَٰهِ النَّاسِ ۝ مِن شَرِّ الْوَسْوَاسِ الْخَنَّاسِ ۝ الَّذِي يُوَسْوِسُ فِي صُدُورِ النَّاسِ ۝ مِنَ الْجِنَّةِ وَالنَّاسِ ۝</div>
+                <div class="bangla-meaning"><strong>অনুবাদ:</strong> বলুন, আমি আশ্রয় প্রার্থনা করছি মানুষের প্রতিপালকের কাছে, মানুষের অধিপতির কাছে, মানুষের উপাস্যের কাছে। আত্মগোপনকারী কুমন্ত্রণাদাতার অনিষ্ট থেকে, যে মানুষের অন্তরে কুমন্ত্রণা দেয় জিন ও মানুষের মধ্য থেকে।</div>
+            </div>
+        </div>
+
+        <div class="accordion">
+            <div class="accordion-header" onclick="toggleAccordion(this)">৫. সূরা আল-কাওসার <span>▼</span></div>
+            <div class="accordion-content">
+                <div class="arabic">إِنَّا أَعْطَيْنَاكَ الْكَوْثَرَ ۝ فَصَلِّ لِرَبِّكَ وَانْحَرْ ۝ إِنَّ شَانِئَكَ هُوَ الْأَبْتَرُ ۝</div>
+                <div class="bangla-meaning"><strong>অনুবাদ:</strong> নিশ্চয়ই আমি আপনাকে কাওসার দান করেছি। অতএব আপনার প্রতিপালকের উদ্দেশ্যে নামাজ পড়ুন এবং কোরবানি করুন। নিশ্চয় আপনার শত্রুই তো নির্বংশ।</div>
+            </div>
+        </div>
+
+        <div class="accordion">
+            <div class="accordion-header" onclick="toggleAccordion(this)">৬. সূরা আল-আসর <span>▼</span></div>
+            <div class="accordion-content">
+                <div class="arabic">وَالْعَصْرِ ۝ إِنَّ الْإِنسَانَ لَفِي خُسْرٍ ۝ إِلَّا الَّذِينَ آمَنُوا وَعَمِلُوا الصَّالِحَاتِ وَتَوَاصَوْا بِالْحَقِّ وَتَوَاصَوْا بِالصَّبْرِ ۝</div>
+                <div class="bangla-meaning"><strong>অনুবাদ:</strong> কালের শপথ! নিশ্চয় মানুষ ক্ষতির মধ্যে রয়েছে। তবে তারা ছাড়া যারা ঈমান এনেছে, সৎকাজ করেছে এবং পরস্পরকে সত্যের ও ধৈর্যের উপদেশ দিয়েছে।</div>
+            </div>
+        </div>
+
+        <!-- প্রয়োজনীয় দোয়া -->
+        <div class="section-title">🤲 প্রয়োজনীয় দোয়া ও জিকির</div>
+        
+        <div class="accordion">
+            <div class="accordion-header" onclick="toggleAccordion(this)">আয়াতুল কুরসী <span>▼</span></div>
+            <div class="accordion-content">
+                <div class="arabic">اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ ۚ لَا تَأْخُذُهُ سِنَةٌ وَلَا نَوْمٌ ۚ لَّهُ مَا فِي السَّمَاوَاتِ وَمَا فِي الْأَرْضِ...</div>
+                <div class="bangla-meaning"><strong>ফজিলত:</strong> প্রত্যেক ফরজ নামাজের পর পাঠ করলে জান্নাতে যাওয়ার পথে মৃত্যু ছাড়া কোনো বাধা থাকে না।</div>
+            </div>
+        </div>
+
+        <div class="accordion">
+            <div class="accordion-header" onclick="toggleAccordion(this)">ঘুমানোর পূর্বের ও পরের দোয়া <span>▼</span></div>
+            <div class="accordion-content">
+                <p><strong>ঘুমানোর দোয়া:</strong></p>
+                <div class="arabic">بِاسْمِكَ اللَّهُمَّ أَمُوتُ وَأَحْيَا</div>
+                <div class="bangla-meaning">"হে আল্লাহ! আপনারই নামে আমি মৃত্যুবরণ করি (ঘুমাই) এবং জীবিত (জাগ্রত) হই।"</div>
+                <br>
+                <p><strong>ঘুম থেকে ওঠার দোয়া:</strong></p>
+                <div class="arabic">الْحَمْدُ لِلَّهِ الَّذِي أَحْيَانَا بَعْدَ مَا أَمَاتَنَا وَإِلَيْهِ النُّشُورُ</div>
+                <div class="bangla-meaning">"সমস্ত প্রশংসা আল্লাহর জন্য, যিনি মৃত্যুর পর আমাদের পুনর্জীবন দান করলেন এবং তাঁরই কাছে সবার পুনরুত্থান।"</div>
+            </div>
+        </div>
+
+        <div class="accordion">
+            <div class="accordion-header" onclick="toggleAccordion(this)">সাইয়্যিদুল ইস্তিগফার (শ্রেষ্ঠ ক্ষমা প্রার্থনা) <span>▼</span></div>
+            <div class="accordion-content">
+                <div class="arabic">اللَّهُمَّ أَنْتَ رَبِّي لَا إِلَهَ إِلَّا أَنْتَ خَلَقْتَنِي وَأَنَا عَبْدُكَ وَأَنَا عَلَى عَهْدِكَ وَوَعْدِكَ مَا اسْتَطَعْتُ...</div>
+                <div class="bangla-meaning"><strong>ফজিলত:</strong> যে ব্যক্তি সকালে বিশ্বাস সহকারে এটি পড়বে আর সন্ধ্যার পূর্বে মারা যাবে সে জান্নাতী হবে। একইভাবে সন্ধ্যায় পড়লে সকালের পূর্বে মারা গেলে জান্নাতী হবে।</div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        function updateClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            
+            const bengaliDigits = {'0':'০','1':'১','2':'২','3':'৩','4':'৪','5':'৫','6':'৬','7':'৭','8':'৮','9':'৯'};
+            const timeStr = `${hours}:${minutes}:${seconds}`.replace(/[0-9]/g, w => bengaliDigits[w]);
+            document.getElementById('liveTime').innerText = timeStr;
+
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            const dateStr = now.toLocaleDateString('bn-BD', options);
+            document.getElementById('liveDate').innerText = dateStr;
+        }
+
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        function toggleAccordion(element) {
+            const content = element.nextElementSibling;
+            const arrow = element.querySelector('span');
+            if (content.style.display === "block") {
+                content.style.display = "none";
+                arrow.innerText = "▼";
+            } else {
+                content.style.display = "block";
+                arrow.innerText = "▲";
+            }
+        }
+
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+            const isDark = document.body.classList.contains('dark-mode');
+            document.getElementById('themeBtn').innerText = isDark ? 'লাইট মোড' : 'ডার্ক মোড';
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        }
+
+        if (localStorage.getItem('theme') === 'dark') {
+            toggleDarkMode();
+        }
+    </script>
+</body>
+</html>
