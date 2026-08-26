@@ -1,4 +1,4 @@
-package com.sabbir.amol
+package com.sabbir.amol // ⚠️ আপনার বর্তমান ফোল্ডার পাথ অনুযায়ী এটি পরিবর্তন করুন
 
 import android.annotation.SuppressLint
 import android.os.Bundle
@@ -10,11 +10,13 @@ import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 
 class MainActivity : AppCompatActivity() {
+
     private lateinit var webView: WebView
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         webView = WebView(this)
         setContentView(webView)
 
@@ -29,8 +31,11 @@ class MainActivity : AppCompatActivity() {
 
         webView.webViewClient = WebViewClient()
         webView.webChromeClient = WebChromeClient()
+
+        // assets থেকে HTML লোড
         webView.loadUrl("file:///android_asset/index.html")
 
+        // ব্যাক বাটন হ্যান্ডলার
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (webView.canGoBack()) {
