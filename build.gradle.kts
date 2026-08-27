@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace = "com.sabbir.amol"
-    compileSdk = 35
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.sabbir.amol"
         minSdk = 24
-        targetSdk = 35
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
     }
@@ -27,8 +27,11 @@ android {
 
     buildFeatures {
         compose = true
-        buildConfig = true
     }
+}
+
+kotlin {
+    jvmToolchain(17)
 }
 
 dependencies {
