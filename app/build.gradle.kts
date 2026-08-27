@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace = "com.satkhiravoice.sabbirsamol"
+    namespace = "com.sabbir.amol"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.satkhiravoice.sabbirsamol"
+        applicationId = "com.sabbir.amol"
         minSdk = 23
         targetSdk = 34
         versionCode = 1
